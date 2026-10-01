@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テストページ</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: sans-serif; background: #eef2ff; color: #243047; }
+    main { padding: 48px; margin: 24px; background: white; border-radius: 20px; box-shadow: 0 12px 40px #24304715; text-align: center; }
+    h1 { margin-top: 0; }
+    button { padding: 12px 24px; border: 0; border-radius: 10px; background: #4f46e5; color: white; font-size: 16px; cursor: pointer; }
+    button:hover { background: #4338ca; }
+    #message { min-height: 24px; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>こんにちは！</h1>
+    <p>これは動作確認用のHTMLページです。</p>
+    <button type="button" id="test-button">クリックしてテスト</button>
+    <p id="message" aria-live="polite"></p>
+  </main>
+  <script>
+    document.getElementById('test-button').addEventListener('click', () => {
+      document.getElementById('message').textContent = '正常に動作しています！';
+    });
+  </script>
+</body>
+</html>

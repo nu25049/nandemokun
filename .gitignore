@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+tmp/
+# 授業から提供された配布資料は自作ソースの公開対象に含めない
+/配布資料/

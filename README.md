@@ -28,7 +28,9 @@
 制作計画は `制作内容/制作計画レポート.txt`、GeminiとCodexの相互共有場所は `制作内容/共有メモ.md`。
 
 ## Vercel
-Framework PresetをNext.jsにし、既存の静的サイト用Build CommandとOutput Directoryの上書きを解除します。mainへのpushで再デプロイします。GitHubへの反映と本番URLでの稼働確認は別に記録します。
+公開URL：https://softwearcreationwhatdo.vercel.app/
+
+2026-10-11：Framework PresetをNext.jsに変更し、Build Command / Output Directory / Install Commandは自動設定で本番配備を完了しました。GitHubのmainへのpushで再デプロイする設定です。公開URLで候補の提案・追加・編集・削除・保存復元、時間と場所の条件、連続回避、スマートフォン幅の操作を確認済みです。天気条件の検証には模擬応答を利用しました。本人の現在地・実天候での評価は今後行います。
 
 ## 第3回までの再確認（2026-10-05）
 端末内保存版の候補追加・編集・削除、1件のランダム提案、再読み込みによる復元、スマートフォン幅の表示を再検証しました。単体テスト5件、型検査、本番ビルド、ヘッドレスEdgeでの主要操作とエラー処理が成功しています。

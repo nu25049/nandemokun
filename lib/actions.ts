@@ -12,6 +12,14 @@ export function pickAction(actions: Action[], random = Math.random): Action | nu
  if (!actions.length) return null;
  return actions[Math.min(actions.length - 1, Math.max(0, Math.floor(random() * actions.length)))];
 }
+export function filterByTime(actions: Action[], maxMinutes: number | null): Action[] {
+ return maxMinutes === null ? actions : actions.filter(action => action.minutes <= maxMinutes);
+}
+export function pickNextAction(actions: Action[], previousId: string | null, avoidRepeat: boolean, random = Math.random): Action | null {
+ const alternatives = avoidRepeat ? actions.filter(action => action.id !== previousId) : actions;
+ // 候補が1件だけでも提案は続けられる。時間条件を広げて補充はしない。
+ return pickAction(alternatives.length ? alternatives : actions, random);
+}
 export function parseActions(raw: string): Action[] {
  const data: unknown = JSON.parse(raw);
  if (!Array.isArray(data) || !data.every(a => a && typeof a.id === 'string' && typeof a.title === 'string' && a.title.trim().length > 0 && a.title.length <= 80 && Number.isInteger(a.minutes) && a.minutes >= 1 && a.minutes <= 1440 && ['indoor','outdoor'].includes(a.place) && typeof a.note === 'string' && a.note.length <= 200)) throw new Error('保存データの形式が不正です');

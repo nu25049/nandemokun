@@ -1,4 +1,12 @@
 export type GameKind = 'calculation' | 'riddle';
+export type TimerMode = 'down' | 'up';
+export function playSettings(query:Record<string,string|string[]|undefined>):{kind:GameKind;minutes:number;mode:TimerMode} {
+ const minutes=typeof query.minutes==='string'?Number(query.minutes):1;
+ return {kind:query.kind==='riddle'?'riddle':'calculation',minutes:[1,3,5,10,15,30,60].includes(minutes)?minutes:1,mode:query.mode==='up'?'up':'down'};
+}
+export function playHref(kind:GameKind,minutes:number,mode:TimerMode):string {
+ return `/play?${new URLSearchParams({kind,minutes:String(minutes),mode})}`;
+}
 export type Question = { id: string; prompt: string; answer: string; explanation: string; choices?: string[] };
 
 // 画面内で完結する、自作の算数・論理問題。答えと理由を一緒に用意する。
@@ -31,6 +39,10 @@ export function nextQuestion(kind: GameKind, previousId?: string, random = Math.
  let b = index(operation === 2 ? 9 : 30, random) + 1;
  if (operation === 1 && b > a) [a,b] = [b,a];
  const symbol = ['＋','−','×'][operation];
+ if (`${a}${symbol}${b}`===previousId) {
+  b=b%(operation===2?9:30)+1;
+  if(operation===1&&b>a)[a,b]=[b,a];
+ }
  const answer = String(operation === 0 ? a + b : operation === 1 ? a - b : a * b);
  return {id:`${a}${symbol}${b}`,prompt:`${a} ${symbol} ${b} = ?`,answer,explanation:`${a} ${symbol} ${b} = ${answer}`};
 }
@@ -40,4 +52,7 @@ export function checkAnswer(question: Question, input: string): boolean {
 }
 export function remainingSeconds(deadline: number, now = Date.now()): number {
  return Math.max(0, Math.ceil((deadline - now) / 1000));
+}
+export function elapsedSeconds(startedAt:number,now=Date.now()):number {
+ return Math.max(0,Math.floor((now-startedAt)/1000));
 }

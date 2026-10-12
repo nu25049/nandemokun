@@ -5,7 +5,7 @@ import {recommendations,type Recommendation,type Source} from '../lib/recommenda
 import type {NearbyPlace} from '../lib/nearby';
 import type {CanvasTask} from '../lib/canvas';
 import WeatherPanel from './weather-panel';
-import PlayPanel from './play-panel';
+import {playHref,type GameKind,type TimerMode} from '../lib/play';
 import NearbyPanel from './nearby-panel';
 import CanvasPanel from './canvas-panel';
 
@@ -15,7 +15,9 @@ export default function Home() {
  const [tasks,setTasks]=useState<CanvasTask[]>([]);
  const [ready,setReady]=useState(false);
  const [result,setResult]=useState<Recommendation|null>(null);
- const [run,setRun]=useState(0);
+ const [gameKind,setGameKind]=useState<GameKind>('calculation');
+ const [gameMinutes,setGameMinutes]=useState(1);
+ const [timerMode,setTimerMode]=useState<TimerMode>('down');
  const [message,setMessage]=useState('');
  const [editing,setEditing]=useState<string|null>(null);
  const [title,setTitle]=useState('');
@@ -49,14 +51,26 @@ export default function Home() {
  function remove(a:Action){if(!window.confirm(`「${a.title}」を削除しますか？`))return;persist(actions.filter(x=>x.id!==a.id));if(result?.source==='saved'&&result.actionId===a.id)setResult(null);if(editing===a.id)resetForm();}
  function changeTime(value:string){setMaxMinutes(value===''?null:Number(value));setResult(null);}
  function changeSource(value:Source){setSource(value);setResult(null);}
- function suggest(){setResult(pickNextAction(eligible,result?.id??null,avoidRepeat));setRun(n=>n+1);setMessage(eligible.length?'空き時間に合う候補を選びました。':'条件を変えるか、連携先を確認してください。');}
+ function suggest(){setResult(pickNextAction(eligible,result?.id??null,avoidRepeat));setMessage(eligible.length?'空き時間に合う候補を選びました。':'条件を変えるか、連携先を確認してください。');}
  const emptyMessage=source==='nearby'?(places.length?'この時間に収まるお店がありません':'先に近くのお店を調べよう'):source==='canvas'?'Canvasの課題を取得してみよう':source==='saved'&&!actions.length?'自分の候補を追加しよう':'この条件に合う候補がありません';
  return <main>
   <header><a className="brand" href="/">暇な君へ<span className="brand-dot">●</span></a><nav className="header-links"><a className="nav" href="#connections">お店・課題</a><a className="nav" href="#my-actions">自分の候補 ↗</a></nav></header>
-  <section className="hero">
-   <div className="intro"><span className="eyebrow">ONE MINUTE, ONE LITTLE ADVENTURE</span><h1>1分空いた。<br/>じゃあ、<em>これしよう。</em></h1><p className="lead">時間を選んで、ボタンをひとつ。<br/>計算も、なぞなぞも、その場で遊べます。</p><div className="hint"><span>✦</span> 題材も問題も、こちらで用意しました。</div></div>
-   <div className="suggestion">
+  <section className="home-dashboard" aria-label="次の行動を提案">
+   <div className="suggestion proposal-card">
     <div className="card-top"><span>YOUR NEXT MOVE</span><span className="pill">{ready?`${eligible.length}件から提案`:'読み込み中'}</span></div>
+    <h1>空いた時間、<em>何しよう？</em></h1>
+    <button className="primary propose-button" disabled={!ready||!eligible.length} onClick={suggest}>{result?'もうひとつ提案して':'いま、何しよう？'} <span>↗</span></button>
+    <div className="result" aria-live="polite">
+     {result?<><div className="result-meta">{result.place==='indoor'?'室内で':'外に出て'} · 約{result.minutes}分</div><h2>{result.title}</h2>{result.note&&<p>{result.game?'下のボタンで専用画面へ。問題に集中して遊べます。':result.note}</p>}
+      {result.dueAt&&<p className="task-due">期限：{new Date(result.dueAt).toLocaleString('ja-JP')}</p>}
+      {result.url&&<a className="result-link" href={result.url} target="_blank" rel="noreferrer">{result.source==='canvas'?'Canvasで課題を開く':'地図でお店を見る'} ↗</a>}
+      {result.game&&<a className="result-link" href={playHref(result.game,result.minutes,timerMode)}>この遊びを大画面で始める ↗</a>}
+     </>:ready&&!eligible.length?<><h2>{emptyMessage}</h2><p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、自分の候補を追加できます。'}</p><button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button></>:
+      <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
+    </div>
+   </div>
+   <div className="dashboard-bottom">
+    <section className="dashboard-options" aria-labelledby="options-title"><span className="eyebrow">YOUR OPTIONS</span><h2 id="options-title">提案のオプション</h2>
     <div className="suggestion-options">
      <label htmlFor="available-time">使える時間</label><select id="available-time" value={maxMinutes??''} onChange={e=>changeTime(e.target.value)} disabled={!ready}><option value="1">1分</option><option value="3">3分</option><option value="5">5分</option><option value="10">10分</option><option value="15">15分</option><option value="30">30分</option><option value="60">60分</option><option value="">時間を指定しない</option></select>
      <label htmlFor="suggestion-source">何系にする？</label><select id="suggestion-source" value={source} onChange={e=>changeSource(e.target.value as Source)} disabled={!ready}><option value="all">おまかせ</option><option value="play">計算・なぞなぞで遊ぶ</option><option value="saved">自分の候補</option><option value="nearby">近くのお店</option><option value="canvas">Canvasの課題</option></select>
@@ -64,15 +78,14 @@ export default function Home() {
      <p className="eligible-count" aria-live="polite">{ready?`提案できる候補：${eligible.length}件`:'候補を読み込み中'}{avoidRepeat&&eligible.length===1?'（1件のため同じ候補を提案します）':''}</p>
      <details className="weather-details"><summary>天気・場所の条件</summary><WeatherPanel indoorOnly={indoorOnly} onChange={changePlace} disabled={!ready}/></details>
     </div>
-    <div className="result" aria-live="polite">
-     {result?<><div className="result-meta">{result.place==='indoor'?'室内で':'外に出て'} · 約{result.minutes}分</div><h2>{result.title}</h2>{result.note&&<p>{result.note}</p>}
-      {result.dueAt&&<p className="task-due">期限：{new Date(result.dueAt).toLocaleString('ja-JP')}</p>}
-      {result.url&&<a className="result-link" href={result.url} target="_blank" rel="noreferrer">{result.source==='canvas'?'Canvasで課題を開く':'地図でお店を見る'} ↗</a>}
-     </>:ready&&!eligible.length?<><h2>{emptyMessage}</h2><p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、自分の候補を追加できます。'}</p><button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button></>:
-      <><div className="orb" aria-hidden="true">↗</div><h2>{maxMinutes?`${maxMinutes}分、遊んでみよう。`:'いま、何してみる？'}</h2><p>ボタンを押せば、次にすることが決まります。<br/>1分から、準備なしで始められます。</p></>}
-    </div>
-    {result?.game&&<PlayPanel key={`${result.id}:${run}`} kind={result.game} minutes={result.minutes}/>}
-    <button className="primary" disabled={!ready||!eligible.length} onClick={suggest}>{result?'別の提案にする':'いま、何しよう？'} <span>↗</span></button><small>空き時間に収まる候補から1件選びます</small>
+    <p className="dashboard-note">お店や課題の接続は、この下から。</p></section>
+    <section className="play-launcher" aria-labelledby="play-title"><span className="eyebrow">JUST PLAY</span><h2 id="play-title">数分だけ、頭を動かそう。</h2><p>問題を大きく、操作は少なく。<br/>計算は正解したら、すぐ次へ。</p>
+     <label htmlFor="game-kind">遊びの種類</label><select id="game-kind" value={gameKind} onChange={e=>setGameKind(e.target.value as GameKind)} disabled={!ready}><option value="calculation">計算チャレンジ</option><option value="riddle">なぞなぞ・ひらめき問題</option></select>
+     <label htmlFor="timer-mode">タイマーの方式</label><select id="timer-mode" value={timerMode} onChange={e=>setTimerMode(e.target.value as TimerMode)} disabled={!ready}><option value="down">カウントダウン</option><option value="up">カウントアップ</option></select>
+     {timerMode==='down'?<><label htmlFor="game-minutes">遊ぶ時間</label><select id="game-minutes" value={gameMinutes} onChange={e=>setGameMinutes(Number(e.target.value))} disabled={!ready}>{[1,3,5,10,15,30,60].map(n=><option key={n} value={n}>{n}分</option>)}</select></>:<p className="timer-explanation">0:00から計測。戻るまで好きなだけ遊べます。</p>}
+     <a className="secondary play-start" href={playHref(gameKind,gameMinutes,timerMode)}>暇つぶしページで遊ぶ <span>↗</span></a>
+     <p className="dashboard-note">遊ぶ画面では、戻る操作と回答だけ。</p>
+    </section>
    </div>
   </section>
   <section id="connections" className="connections"><div className="section-heading"><div><span className="eyebrow">A LITTLE FURTHER</span><h2>外に出る？ 課題を進める？</h2></div><p>つないだ情報も、おまかせ提案に加わります。</p></div><div className="connection-columns"><NearbyPanel onChange={changePlaces}/><CanvasPanel onChange={changeTasks}/></div></section>

@@ -67,7 +67,7 @@
 .quick-play-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .quick-play-links a{min-height:46px;display:flex;align-items:center;justify-content:center;gap:8px;background:white;border:1px solid #aabb8e;border-radius:10px;text-decoration:none;color:var(--green);font-size:14px}
 .quick-play-links a:hover{background:#dce9c5}
-.focus-choices button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 0 0 3px #c6de86}
+.focus-choices button[aria-pressed="true"],.focus-choices button[aria-pressed="true"]:hover:enabled{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 0 0 3px #c6de86}
 .quiz-instruction{font-size:13px;color:#677855;line-height:1.8;margin:0 0 18px}
 .focus-feedback p.quiz-error{color:#9b4125;font-weight:600}
 .focus-feedback p.previous-explanation{font-size:13px;color:#6e7c5e;border-top:1px solid #d8e1cc;padding-top:10px;margin-top:12px}

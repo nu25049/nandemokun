@@ -61,3 +61,14 @@
  .focus-choices{grid-template-columns:1fr;gap:10px}.focus-choices button{min-height:62px;font-size:21px;padding:14px}.focus-feedback{min-height:135px;margin-top:20px}.focus-feedback p{font-size:14px}.focus-feedback strong{font-size:21px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+.quick-play{margin-top:24px;padding-top:20px;border-top:1px solid #c9d5b5}
+.quick-play h3{margin:0 0 7px;font-size:15px}
+.quick-play p{font-size:11px;color:#617151;line-height:1.8;margin:0 0 12px}
+.quick-play-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quick-play-links a{min-height:46px;display:flex;align-items:center;justify-content:center;gap:8px;background:white;border:1px solid #aabb8e;border-radius:10px;text-decoration:none;color:var(--green);font-size:14px}
+.quick-play-links a:hover{background:#dce9c5}
+.focus-choices button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 0 0 3px #c6de86}
+.quiz-instruction{font-size:13px;color:#677855;line-height:1.8;margin:0 0 18px}
+.focus-feedback p.quiz-error{color:#9b4125;font-weight:600}
+.focus-feedback p.previous-explanation{font-size:13px;color:#6e7c5e;border-top:1px solid #d8e1cc;padding-top:10px;margin-top:12px}
+@media(max-width:650px){.focus-calculation .equation-result{display:block;font-size:.65em;line-height:1.4;margin-top:6px}.quiz-instruction{font-size:12px}.quick-play-links{gap:8px}}

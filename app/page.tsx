@@ -5,7 +5,7 @@ import {recommendations,type Recommendation,type Source} from '../lib/recommenda
 import type {NearbyPlace} from '../lib/nearby';
 import type {CanvasTask} from '../lib/canvas';
 import WeatherPanel from './weather-panel';
-import {playHref,type GameKind,type TimerMode} from '../lib/play';
+import {DEFAULT_PLAY_MINUTES,playHref,type GameKind,type TimerMode} from '../lib/play';
 import NearbyPanel from './nearby-panel';
 import CanvasPanel from './canvas-panel';
 
@@ -16,7 +16,7 @@ export default function Home() {
  const [ready,setReady]=useState(false);
  const [result,setResult]=useState<Recommendation|null>(null);
  const [gameKind,setGameKind]=useState<GameKind>('calculation');
- const [gameMinutes,setGameMinutes]=useState(1);
+ const [gameMinutes,setGameMinutes]=useState(DEFAULT_PLAY_MINUTES);
  const [timerMode,setTimerMode]=useState<TimerMode>('down');
  const [message,setMessage]=useState('');
  const [editing,setEditing]=useState<string|null>(null);
@@ -79,12 +79,13 @@ export default function Home() {
      <details className="weather-details"><summary>天気・場所の条件</summary><WeatherPanel indoorOnly={indoorOnly} onChange={changePlace} disabled={!ready}/></details>
     </div>
     <p className="dashboard-note">お店や課題の接続は、この下から。</p></section>
-    <section className="play-launcher" aria-labelledby="play-title"><span className="eyebrow">JUST PLAY</span><h2 id="play-title">数分だけ、頭を動かそう。</h2><p>問題を大きく、操作は少なく。<br/>計算は正解したら、すぐ次へ。</p>
+    <section className="play-launcher" aria-labelledby="play-title"><span className="eyebrow">JUST PLAY</span><h2 id="play-title">頭を動かして、暇つぶし。</h2><p>通常は30分から。短時間なら別タブへ。<br/>計算もクイズも、正解したらすぐ次へ。</p>
      <label htmlFor="game-kind">遊びの種類</label><select id="game-kind" value={gameKind} onChange={e=>setGameKind(e.target.value as GameKind)} disabled={!ready}><option value="calculation">計算チャレンジ</option><option value="riddle">なぞなぞ・ひらめき問題</option></select>
      <label htmlFor="timer-mode">タイマーの方式</label><select id="timer-mode" value={timerMode} onChange={e=>setTimerMode(e.target.value as TimerMode)} disabled={!ready}><option value="down">カウントダウン</option><option value="up">カウントアップ</option></select>
-     {timerMode==='down'?<><label htmlFor="game-minutes">遊ぶ時間</label><select id="game-minutes" value={gameMinutes} onChange={e=>setGameMinutes(Number(e.target.value))} disabled={!ready}>{[1,3,5,10,15,30,60].map(n=><option key={n} value={n}>{n}分</option>)}</select></>:<p className="timer-explanation">0:00から計測。戻るまで好きなだけ遊べます。</p>}
+     {timerMode==='down'?<><label htmlFor="game-minutes">遊ぶ時間</label><select id="game-minutes" value={gameMinutes} onChange={e=>setGameMinutes(Number(e.target.value))} disabled={!ready}>{[1,2,3,5,10,15,30,60].map(n=><option key={n} value={n}>{n}分</option>)}</select></>:<p className="timer-explanation">0:00から計測。戻るまで好きなだけ遊べます。</p>}
      <a className="secondary play-start" href={playHref(gameKind,gameMinutes,timerMode)}>暇つぶしページで遊ぶ <span>↗</span></a>
      <p className="dashboard-note">遊ぶ画面では、戻る操作と回答だけ。</p>
+     <div className="quick-play"><h3>1〜3分だけ遊ぶ</h3><p>選んだ種類を、新しいタブで開きます。</p><div className="quick-play-links">{[1,2,3].map(n=><a key={n} href={playHref(gameKind,n,'down')} target="_blank" rel="noopener noreferrer" aria-label={`${n}分の暇つぶしを別タブで開く`}>{n}分 <span aria-hidden="true">↗</span></a>)}</div></div>
     </section>
    </div>
   </section>

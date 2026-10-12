@@ -1,8 +1,9 @@
 export type GameKind = 'calculation' | 'riddle';
 export type TimerMode = 'down' | 'up';
+export const DEFAULT_PLAY_MINUTES=30;
 export function playSettings(query:Record<string,string|string[]|undefined>):{kind:GameKind;minutes:number;mode:TimerMode} {
- const minutes=typeof query.minutes==='string'?Number(query.minutes):1;
- return {kind:query.kind==='riddle'?'riddle':'calculation',minutes:[1,3,5,10,15,30,60].includes(minutes)?minutes:1,mode:query.mode==='up'?'up':'down'};
+ const minutes=typeof query.minutes==='string'?Number(query.minutes):DEFAULT_PLAY_MINUTES;
+ return {kind:query.kind==='riddle'?'riddle':'calculation',minutes:[1,2,3,5,10,15,30,60].includes(minutes)?minutes:DEFAULT_PLAY_MINUTES,mode:query.mode==='up'?'up':'down'};
 }
 export function playHref(kind:GameKind,minutes:number,mode:TimerMode):string {
  return `/play?${new URLSearchParams({kind,minutes:String(minutes),mode})}`;
@@ -35,12 +36,14 @@ export function nextQuestion(kind: GameKind, previousId?: string, random = Math.
   return {...question, choices: options};
  }
  const operation = index(3, random);
- let a = index(operation === 2 ? 9 : 40, random) + 1;
- let b = index(operation === 2 ? 9 : 30, random) + 1;
+ const minimum=operation===2?10:1000;
+ const range=operation===2?90:9000;
+ let a = index(range, random) + minimum;
+ let b = index(range, random) + minimum;
  if (operation === 1 && b > a) [a,b] = [b,a];
  const symbol = ['＋','−','×'][operation];
  if (`${a}${symbol}${b}`===previousId) {
-  b=b%(operation===2?9:30)+1;
+  b=minimum+(b-minimum+1)%range;
   if(operation===1&&b>a)[a,b]=[b,a];
  }
  const answer = String(operation === 0 ? a + b : operation === 1 ? a - b : a * b);

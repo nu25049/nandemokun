@@ -25,14 +25,14 @@ export function refreshInitialActions(actions: Action[]): Action[] {
   return initialActions.find(item => item.id === action.id) ?? action;
  });
 }
-export function pickAction(actions: Action[], random = Math.random): Action | null {
+export function pickAction<T extends Action>(actions: T[], random = Math.random): T | null {
  if (!actions.length) return null;
  return actions[Math.min(actions.length - 1, Math.max(0, Math.floor(random() * actions.length)))];
 }
-export function filterByTime(actions: Action[], maxMinutes: number | null): Action[] {
+export function filterByTime<T extends Action>(actions: T[], maxMinutes: number | null): T[] {
  return maxMinutes === null ? actions : actions.filter(action => action.minutes <= maxMinutes);
 }
-export function pickNextAction(actions: Action[], previousId: string | null, avoidRepeat: boolean, random = Math.random): Action | null {
+export function pickNextAction<T extends Action>(actions: T[], previousId: string | null, avoidRepeat: boolean, random = Math.random): T | null {
  const alternatives = avoidRepeat ? actions.filter(action => action.id !== previousId) : actions;
  // 候補が1件だけでも提案は続けられる。時間条件を広げて補充はしない。
  return pickAction(alternatives.length ? alternatives : actions, random);

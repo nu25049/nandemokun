@@ -1,5 +1,6 @@
 import type {Action} from './actions';
 import type {Category} from './categories';
+import {extraCatalog} from './catalog-extra';
 export type CatalogAction=Action&{category:Category};
 type Row=[title:string,minutes:number,note:string,place?:'indoor'|'outdoor'];
 const groups:Partial<Record<Category,Row[]>>={
@@ -88,4 +89,4 @@ const groups:Partial<Record<Category,Row[]>>={
   ['近所を歩いて短い紹介文を書く',30,'10分進んで同じ道を戻る。帰ってから、見つけた物を使って近所の紹介文を3行書く。','outdoor'],
  ],
 };
-export const catalog:CatalogAction[]=Object.entries(groups).flatMap(([category,rows])=>rows.map(([title,minutes,note,place='indoor'],i)=>({id:`catalog:${category}:${i+1}`,title,minutes,note,place,category:category as Category})));
+export const catalog:CatalogAction[]=[...Object.entries(groups).flatMap(([category,rows])=>rows.map(([title,minutes,note,place='indoor'],i)=>({id:`catalog:${category}:${i+1}`,title,minutes,note,place,category:category as Category}))),...extraCatalog];

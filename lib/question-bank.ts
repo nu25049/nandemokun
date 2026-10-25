@@ -1,4 +1,5 @@
 import type {Question} from './play';
+import {extraRiddles,extraSequences,makeWordOperations} from './question-extra';
 
 export const riddleQuestions: Question[] = [
  {id:'family', prompt:'3人の兄弟には、それぞれ同じ姉が1人います。きょうだいは全部で何人？', choices:['4人','6人','7人'],answer:'4人',explanation:'兄弟3人と、3人に共通する姉1人で4人です。'},
@@ -54,6 +55,7 @@ const additional:Question[]=[
  {id:'pair-sum',prompt:'同じ数を2回足すと18です。その数に3を足すと？',choices:['9','12','21'],answer:'12',explanation:'元の数は18÷2＝9。9＋3＝12です。'},
 ];
 riddleQuestions.push(...additional);
+riddleQuestions.push(...extraRiddles);
 
 function numeric(id:string,prompt:string,answer:number,explanation:string):Question {
  const gap=answer%7+1;
@@ -78,6 +80,7 @@ for(let start=1;start<=20;start++){
 }
 
 const words=['りんご','ごりら','らっぱ','ぱせり','りす','すいか','からす','すずめ','めだか','かめ','めがね','ねこ','こま','まくら','らくだ','だるま','まめ','めじろ','ろば','ばら','らっこ','こあら','らむね','ねぎ','ぎんが','がくふ','ふね','ねずみ','みかづき','きつね','ねんど','どらむ','むぎ','ぎんいろ','ろうそく','くるま','まど','どんぐり','りか','かに','にわとり','りょうり','りゅう','うさぎ','ぎょうざ','ざる','るり','りぼん','すし','しか','かさ','さかな','なす','すな','なべ','べる','るす','すもう','うま','まつり','りれー','こい','いす','すみれ','れもん','いちご','ごま','まち','ちず','ずこう','うちわ','わに','にく','くり','りゆう','うで','でぐち','ちから','らくご','ごご','ごはん','さくら','らせん','みみ','もも','こころ','ことば','はな','たまご','とけい','ひこうき','ほし','まほう','ゆき','よぞら','わたあめ','あさがお','おかし','しろくま','まぐろ','ろじ','じしょ','しお','おに','にじ','じゃがいも','もり','ふくろ','ろくろ','くつ','つき','きのこ'];
+sequenceQuestions.push(...extraSequences);
 const playable=words.filter(word=>!/[んーょゅゃ]$/.test(word));
 export const wordQuestions:Question[]=[];
 for(const word of playable){
@@ -93,3 +96,4 @@ for(const word of playable){
   wordQuestions.push({id:`word:count:${word}:${letter}:${repeat}`,prompt:`「${phrase}」の中に「${letter}」は何個ある？ 区切りの「・」は数えません。`,answer:`${count}個`,choices:[`${count-1}個`,`${count}個`,`${count+1}個`],explanation:`「${word}」に「${letter}」は${count/repeat}個。それが${repeat}回なので${count}個です。`});
  }
 }
+wordQuestions.push(...makeWordOperations(playable));

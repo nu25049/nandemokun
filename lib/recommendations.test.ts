@@ -7,14 +7,14 @@ const place:NearbyPlace={id:'node-1',name:'お店',category:'カフェ',distance
 const task:CanvasTask={id:'1',name:'演習課題',dueAt:null,url:'https://nu.instructure.com/courses/1/assignments/1'};
 describe('時間と種類に合わせる提案',()=>{
  it('保存候補0件でも、1分から外部接続なしで遊べる',()=>{
-  const pool=recommendations([],[],[],1,false,'all');expect(pool).toHaveLength(2);
-  expect(pool.every(p=>p.source==='play'&&p.minutes===1)).toBe(true);
+  const pool=recommendations([],[],[],1,false,'all');expect(pool.length).toBeGreaterThan(4);
+  expect(pool.every(p=>['play','library'].includes(p.source)&&p.minutes===1)).toBe(true);
  });
  it('自分の候補の0件・1件と、種類を限定した連続回避を守る',()=>{
   expect(recommendations([],[],[],1,false,'saved')).toEqual([]);
   const pool=recommendations([initialActions[0]],[],[],30,false,'saved');expect(pool).toHaveLength(1);
   expect(pickNextAction(pool,pool[0].id,true)).toEqual(pool[0]);
-  const play=recommendations([],[],[],1,false,'play');expect(pickNextAction(play,play[0].id,true)?.id).toBe(play[1].id);
+  const play=recommendations([],[],[],1,false,'play');expect(pickNextAction(play,play[0].id,true,()=>0)?.id).toBe(play[1].id);
  });
  it('お店は往復＋滞在を満たす場合だけで、室内限定なら出さない',()=>{
   expect(recommendations([],[place],[],22,false,'nearby')).toHaveLength(0);

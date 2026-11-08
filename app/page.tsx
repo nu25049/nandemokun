@@ -11,6 +11,9 @@ import {defaultPreferences,HISTORY_KEY,parseRecent,pickPersonalized,visibleRecom
 import PreferencesPanel from './preferences-panel';
 import NearbyPanel from './nearby-panel';
 import CanvasPanel from './canvas-panel';
+import EngagementPanel,{ResultFeedback} from './engagement-panel';
+import {ENGAGEMENT_KEY,emptyEngagement,parseEngagement,rate,toggleFavorite,learningFactors,type Engagement,type Outcome} from '../lib/engagement';
+type HomeSource=Source|'favorites';
 
 export default function Home() {
  const [actions,setActions]=useState<Action[]>([]);
@@ -28,22 +31,34 @@ export default function Home() {
  const [place,setPlace]=useState<'indoor'|'outdoor'>('indoor');
  const [note,setNote]=useState('');
  const [maxMinutes,setMaxMinutes]=useState<number|null>(1);
- const [source,setSource]=useState<Source>('all');
+ const [source,setSource]=useState<HomeSource>('all');
  const [avoidRepeat,setAvoidRepeat]=useState(false);
  const [indoorOnly,setIndoorOnly]=useState(false);
  const [preferences,setPreferences]=useState(defaultPreferences);
  const recent=useRef<string[]>([]);
+ const [engagement,setEngagement]=useState(emptyEngagement);
+ const engagementRef=useRef(engagement);
+ const resultToken=useRef('');
+ const [engagementNotice,setEngagementNotice]=useState('');
  const changePreferences=useCallback((next:Preferences)=>{setPreferences(next);setResult(current=>current&&next.weights[current.category]===0?null:current);},[]);
  const changePlace=useCallback((value:boolean)=>{setIndoorOnly(value);setResult(current=>value&&current?.place==='outdoor'?null:current);},[]);
  const changePlaces=useCallback((next:NearbyPlace[])=>{setPlaces(next);setResult(current=>current?.source==='nearby'?null:current);},[]);
  const changeTasks=useCallback((next:CanvasTask[])=>{setTasks(next);setResult(current=>current?.source==='canvas'?null:current);},[]);
- const eligible=visibleRecommendations(recommendations(actions,places,tasks,maxMinutes,indoorOnly,source),preferences);
+ const localPool=recommendations(actions,[],[],null,false,'all').map(item=>item.game?{...item,title:GAME_LABELS[item.game]+'で遊ぶ'}:item);
+ const eligibleAll=visibleRecommendations(recommendations(actions,places,tasks,maxMinutes,indoorOnly,source==='favorites'?'all':source),preferences);
+ const eligible=source==='favorites'?eligibleAll.filter(item=>engagement.favorites.includes(item.id)):eligibleAll;
+ const favoriteEligibleIds=new Set(visibleRecommendations(recommendations(actions,[],[],maxMinutes,indoorOnly,'all'),preferences).map(item=>item.id));
  useEffect(()=>{
-  try {const raw=localStorage.getItem(STORAGE_KEY);setActions(raw===null?initialActions:refreshInitialActions(parseActions(raw)));}
+  let loaded:Action[]=[];
+  try {const raw=localStorage.getItem(STORAGE_KEY);loaded=raw===null?initialActions:refreshInitialActions(parseActions(raw));setActions(loaded);}
   catch {setMessage('保存データを読み込めませんでした。自分の候補を追加して再保存できます。画面内の遊びは利用できます。');}
+  try{const saved=parseEngagement(localStorage.getItem(ENGAGEMENT_KEY),recommendations(loaded,[],[],null,false,'all'));engagementRef.current=saved;setEngagement(saved);}
+  catch{setEngagementNotice('利用記録を読み込めませんでした。初期状態で続けられます。新しい操作で再保存できます。');}
   setReady(true);
   try{recent.current=parseRecent(localStorage.getItem(HISTORY_KEY));}catch{recent.current=[];}
  },[]);
+ function saveEngagement(next:Engagement){if(source==='favorites')setResult(current=>current&&!next.favorites.includes(current.id)?null:current);engagementRef.current=next;setEngagement(next);try{localStorage.setItem(ENGAGEMENT_KEY,JSON.stringify(next));setEngagementNotice('お気に入り・利用記録をこのブラウザーに保存しました。');}catch{setEngagementNotice('利用記録を端末に保存できませんでした。この画面では使えますが、再読み込みで失われます。');}}
+ function recordOutcome(outcome:Outcome){if(result)saveEngagement(rate(engagementRef.current,result,resultToken.current,outcome));}
  function persist(next:Action[]){setActions(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));setMessage('自分の候補をこの端末に保存しました。');}catch{setMessage('端末への保存に失敗しました。再読み込みすると変更が失われる可能性があります。');}}
  function resetForm(){setEditing(null);setTitle('');setMinutes('15');setPlace('indoor');setNote('');}
  function submit(e:React.FormEvent){
@@ -55,13 +70,13 @@ export default function Home() {
   resetForm();
  }
  function edit(a:Action){setEditing(a.id);setTitle(a.title);setMinutes(String(a.minutes));setPlace(a.place);setNote(a.note);document.getElementById('action-title')?.focus();}
- function remove(a:Action){if(!window.confirm(`「${a.title}」を削除しますか？`))return;persist(actions.filter(x=>x.id!==a.id));if(result?.source==='saved'&&result.actionId===a.id)setResult(null);if(editing===a.id)resetForm();}
+ function remove(a:Action){if(!window.confirm(`「${a.title}」を削除しますか？`))return;const next=actions.filter(x=>x.id!==a.id);persist(next);saveEngagement(parseEngagement(JSON.stringify(engagementRef.current),recommendations(next,[],[],null,false,'all')));if(result?.source==='saved'&&result.actionId===a.id)setResult(null);if(editing===a.id)resetForm();}
  function changeTime(value:string){setMaxMinutes(value===''?null:Number(value));setResult(null);}
- function changeSource(value:Source){setSource(value);setResult(null);}
- function suggest(){const alternatives=avoidRepeat?eligible.filter(item=>item.id!==result?.id):eligible;const next=pickPersonalized(alternatives.length?alternatives:eligible,preferences,recent.current);setResult(next);if(next){recent.current=[...recent.current,next.id].slice(-20);try{localStorage.setItem(HISTORY_KEY,JSON.stringify(recent.current.filter(id=>!id.startsWith('nearby:')&&!id.startsWith('canvas:'))));}catch{/* 履歴の保存失敗でも提案は続ける。 */}}setMessage(next?'空き時間と好みに合う候補を選びました。':'条件や提案の傾向を確認してください。');}
- const emptyMessage=source==='nearby'?(places.length?'この時間に収まるお店がありません':'先に近くのお店を調べよう'):source==='canvas'?'Canvasの課題を取得してみよう':source==='saved'&&!actions.length?'自分の候補を追加しよう':'この条件に合う候補がありません';
+ function changeSource(value:HomeSource){setSource(value);setResult(null);}
+ function suggest(){const alternatives=avoidRepeat?eligible.filter(item=>item.id!==result?.id):eligible;const next=pickPersonalized(alternatives.length?alternatives:eligible,preferences,recent.current,Math.random,learningFactors(engagementRef.current));resultToken.current=crypto.randomUUID();setResult(next);if(next){const tracked=rate(engagementRef.current,next,resultToken.current,'pending');if(tracked!==engagementRef.current)saveEngagement(tracked);recent.current=[...recent.current,next.id].slice(-20);try{localStorage.setItem(HISTORY_KEY,JSON.stringify(recent.current.filter(id=>!id.startsWith('nearby:')&&!id.startsWith('canvas:'))));}catch{/* 履歴の保存失敗でも提案は続ける。 */}}setMessage(next?'空き時間と好みに合う候補を選びました。':'条件や提案の傾向を確認してください。');}
+ const emptyMessage=source==='favorites'?'今の条件に合うお気に入りがありません':source==='nearby'?(places.length?'この時間に収まるお店がありません':'先に近くのお店を調べよう'):source==='canvas'?'Canvasの課題を取得してみよう':source==='saved'&&!actions.length?'自分の候補を追加しよう':'この条件に合う候補がありません';
  return <main>
-  <header><a className="brand" href="/">暇な君へ<span className="brand-dot">●</span></a><nav className="header-links"><a className="nav" href="#preferences">好み・ログイン</a><a className="nav" href="#connections">お店・課題</a><a className="nav" href="#my-actions">自分の候補 ↗</a></nav></header>
+  <header><a className="brand" href="/">暇な君へ<span className="brand-dot">●</span></a><nav className="header-links"><a className="nav" href="#preferences">好み・ログイン</a><a className="nav" href="#activity">利用記録</a><a className="nav" href="#connections">お店・課題</a><a className="nav" href="#my-actions">自分の候補 ↗</a></nav></header>
   <section className="home-dashboard" aria-label="次の行動を提案">
    <div className="suggestion proposal-card">
     <div className="card-top"><span>YOUR NEXT MOVE</span><span className="pill">{ready?`${eligible.length}件から提案`:'読み込み中'}</span></div>
@@ -72,6 +87,7 @@ export default function Home() {
       {result.dueAt&&<p className="task-due">期限：{new Date(result.dueAt).toLocaleString('ja-JP')}</p>}
       {result.url&&<a className="result-link" href={result.url} target="_blank" rel="noreferrer">{result.source==='canvas'?'Canvasで課題を開く':'地図でお店を見る'} ↗</a>}
       {result.game&&<a className="result-link" href={playHref(result.game,result.minutes,timerMode)}>この遊びを大画面で始める ↗</a>}
+      <ResultFeedback item={result} state={engagement} outcome={engagement.feedback.find(row=>row.id===resultToken.current)?.outcome} onRate={recordOutcome} onFavorite={()=>saveEngagement(toggleFavorite(engagementRef.current,result))}/>
      </>:ready&&!eligible.length?<><h2>{emptyMessage}</h2><p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、提案の傾向を初期値に戻してみてください。'}</p><a className="reset-time" href="#preferences">提案の傾向を調整する</a><button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button></>:
       <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
     </div>
@@ -80,7 +96,7 @@ export default function Home() {
     <section className="dashboard-options" aria-labelledby="options-title"><span className="eyebrow">YOUR OPTIONS</span><h2 id="options-title">提案のオプション</h2>
     <div className="suggestion-options">
      <label htmlFor="available-time">使える時間</label><select id="available-time" value={maxMinutes??''} onChange={e=>changeTime(e.target.value)} disabled={!ready}><option value="1">1分</option><option value="3">3分</option><option value="5">5分</option><option value="10">10分</option><option value="15">15分</option><option value="30">30分</option><option value="60">60分</option><option value="">時間を指定しない</option></select>
-     <label htmlFor="suggestion-source">何系にする？</label><select id="suggestion-source" value={source} onChange={e=>changeSource(e.target.value as Source)} disabled={!ready}><option value="all">おまかせ</option><option value="play">画面内のゲーム</option><option value="library">おすすめの暇つぶし</option><option value="saved">自分の候補</option><option value="nearby">近くのお店</option><option value="canvas">Canvasの課題</option></select>
+     <label htmlFor="suggestion-source">何系にする？</label><select id="suggestion-source" value={source} onChange={e=>changeSource(e.target.value as HomeSource)} disabled={!ready}><option value="all">おまかせ</option><option value="play">画面内のゲーム</option><option value="library">おすすめの暇つぶし</option><option value="saved">自分の候補</option><option value="favorites">お気に入り</option><option value="nearby">近くのお店</option><option value="canvas">Canvasの課題</option></select>
      <label className="repeat-option"><input type="checkbox" checked={avoidRepeat} onChange={e=>setAvoidRepeat(e.target.checked)} disabled={!ready}/>同じ候補の連続を避ける</label>
      <p className="eligible-count" aria-live="polite">{ready?`提案できる候補：${eligible.length}件`:'候補を読み込み中'}{avoidRepeat&&eligible.length===1?'（1件のため同じ候補を提案します）':''}</p>
      <details className="weather-details"><summary>天気・場所の条件</summary><WeatherPanel indoorOnly={indoorOnly} onChange={changePlace} disabled={!ready}/></details>
@@ -98,6 +114,7 @@ export default function Home() {
    </div>
   </section>
   <section className="catalog-preview"><h2>お題探しも、おまかせ。</h2><p>作って遊ぶ・ひと休み・観察・身の回り・考えて学ぶ・軽く動く。手順付きの暇つぶしを{catalog.length}件用意しました。</p><button className="weather-button" onClick={()=>{setSource('library');setResult(null);document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}}>おすすめの暇つぶしから選ぶ</button></section>
+  <EngagementPanel state={engagement} pool={localPool} eligibleIds={favoriteEligibleIds} notice={engagementNotice} onChange={saveEngagement} onFavorites={()=>{changeSource('favorites');document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}} onClear={()=>{if(window.confirm('利用記録と自動調整をリセットしますか？ お気に入りと手動の好みは残ります。'))saveEngagement({...engagementRef.current,learn:false,feedback:[]});}}/>
   <PreferencesPanel onChange={changePreferences}/>
   <section id="connections" className="connections"><div className="section-heading"><div><span className="eyebrow">A LITTLE FURTHER</span><h2>外に出る？ 課題を進める？</h2></div><p>つないだ情報も、おまかせ提案に加わります。</p></div><div className="connection-columns"><NearbyPanel onChange={changePlaces}/><CanvasPanel onChange={changeTasks}/></div></section>
   <section className="workspace" id="my-actions"><div className="section-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2>自分の「やってみたい」も追加。</h2></div><p>普段やりたいことは、ここに保存。</p></div><div className="columns">

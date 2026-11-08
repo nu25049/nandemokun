@@ -15,13 +15,14 @@ export function parsePreferences(raw:unknown):Preferences {
 }
 export function visibleRecommendations(pool:Recommendation[],prefs:Preferences):Recommendation[]{return pool.filter(item=>prefs.weights[item.category]>0);}
 const unit=(value:number)=>Number.isFinite(value)?Math.min(0.999999999,Math.max(0,value)):0;
-export function pickPersonalized(pool:Recommendation[],prefs:Preferences,recent:string[]=[],random=Math.random):Recommendation|null {
+export function pickPersonalized(pool:Recommendation[],prefs:Preferences,recent:string[]=[],random=Math.random,factors:Partial<Record<Category,number>>={}):Recommendation|null {
  let candidates=visibleRecommendations(pool,prefs);
  if(!candidates.length)return null;
  if(prefs.avoidRecent){const fresh=candidates.filter(item=>!recent.includes(item.id));if(fresh.length)candidates=fresh;}
  const groups=CATEGORIES.map(category=>({category,items:candidates.filter(item=>item.category===category)})).filter(group=>group.items.length);
- let value=unit(random())*groups.reduce((sum,group)=>sum+prefs.weights[group.category],0);
- const group=groups.find(group=>{value-=prefs.weights[group.category];return value<0;})??groups[groups.length-1];
+ const weight=(category:Category)=>prefs.weights[category]*(Number.isFinite(factors[category])?Math.min(2,Math.max(.5,factors[category]!)):1);
+ let value=unit(random())*groups.reduce((sum,group)=>sum+weight(group.category),0);
+ const group=groups.find(group=>{value-=weight(group.category);return value<0;})??groups[groups.length-1];
  return group.items[Math.floor(unit(random())*group.items.length)];
 }
 export function parseRecent(raw:string|null):string[]{

@@ -89,3 +89,22 @@
 .header-links{flex-wrap:wrap;justify-content:flex-end;max-width:65%;row-gap:7px}
 .proposal-card .reset-time{margin:8px 12px}
 @media(max-width:650px){.preferences-columns{grid-template-columns:1fr}.preference-card{padding:20px}.weight-grid{gap:0 12px}.header-links{max-width:58%;column-gap:10px}.header-links .nav{font-size:10px}.catalog-preview{padding:22px}.catalog-preview h2{font-size:20px}}
+
+/* 利用結果の操作は提案の下に置き、ゲームの集中画面には増やさない。 */
+.result-feedback{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}
+.result-feedback button,.activity-list button{border:1px solid #aabd98;border-radius:10px;background:#fff;color:var(--green);padding:12px 14px;min-height:44px;font-size:12px}
+.result-feedback button[aria-pressed="true"]{background:var(--green);color:white;border-color:var(--green)}
+.feedback-note{margin-top:15px!important;font-size:11px!important}
+.activity-section{border-top:1px solid #d9ddd3;padding:35px 0 45px;scroll-margin-top:20px}
+.activity-columns{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+.activity-list{list-style:none;padding:0;margin:16px 0;max-height:360px;overflow:auto}
+.activity-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #dfe5d7;padding:14px 0}
+.activity-list li>div{min-width:0}.activity-list strong{display:block;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.activity-list small{display:block;font-size:11px;line-height:1.8;color:#617151}
+.activity-list button{flex-shrink:0}
+.activity-history{background:#fff;border:1px solid #dde2d4;border-radius:14px;padding:18px 24px;margin-top:24px}
+.activity-history summary{cursor:pointer;min-height:30px;color:var(--green);font-size:14px}
+.activity-history>p,.learning-summary{font-size:12px;line-height:1.9;color:#617151}
+@media(max-width:650px){.activity-columns{grid-template-columns:1fr}.activity-history{padding:18px}.result-feedback{gap:8px}.result-feedback button{padding:10px;font-size:12px}.activity-section .section-heading{display:block}}
+
+.history-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:290px}.history-actions button[aria-pressed="true"]{background:var(--green);color:#fff}@media(max-width:650px){.activity-history .activity-list li{align-items:flex-start;flex-direction:column}.history-actions{justify-content:flex-start;max-width:100%}.activity-list button{padding:10px}}

@@ -12,6 +12,7 @@ import PreferencesPanel from './preferences-panel';
 import NearbyPanel from './nearby-panel';
 import CanvasPanel from './canvas-panel';
 import BackupPanel from './backup-panel';
+import ActionList from './action-list';
 import EngagementPanel,{ResultFeedback} from './engagement-panel';
 import {ENGAGEMENT_KEY,emptyEngagement,parseEngagement,rate,toggleFavorite,learningFactors,type Engagement,type Outcome} from '../lib/engagement';
 type HomeSource=Source|'favorites';
@@ -88,6 +89,7 @@ export default function Home() {
       {result.dueAt&&<p className="task-due">期限：{new Date(result.dueAt).toLocaleString('ja-JP')}</p>}
       {result.url&&<a className="result-link" href={result.url} target="_blank" rel="noreferrer">{result.source==='canvas'?'Canvasで課題を開く':'地図でお店を見る'} ↗</a>}
       {result.game&&<a className="result-link" href={playHref(result.game,result.minutes,timerMode)}>この遊びを大画面で始める ↗</a>}
+      {!result.game&&(result.source==='library'||result.source==='saved')&&<a className="result-link" href={'/activity?id='+encodeURIComponent(result.id)}>手順とタイマーを開いて始める ↗</a>}
       <ResultFeedback item={result} state={engagement} outcome={engagement.feedback.find(row=>row.id===resultToken.current)?.outcome} onRate={recordOutcome} onFavorite={()=>saveEngagement(toggleFavorite(engagementRef.current,result))}/>
      </>:ready&&!eligible.length?<><h2>{emptyMessage}</h2><p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、提案の傾向を初期値に戻してみてください。'}</p><a className="reset-time" href="#preferences">提案の傾向を調整する</a><button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button></>:
       <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
@@ -114,14 +116,14 @@ export default function Home() {
     </section>
    </div>
   </section>
-  <section className="catalog-preview"><h2>お題探しも、おまかせ。</h2><p>作って遊ぶ・ひと休み・観察・身の回り・考えて学ぶ・軽く動く。手順付きの暇つぶしを{catalog.length}件用意しました。</p><button className="weather-button" onClick={()=>{setSource('library');setResult(null);document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}}>おすすめの暇つぶしから選ぶ</button></section>
+  <section className="catalog-preview"><h2>お題探しも、おまかせ。</h2><p>作って遊ぶ・ひと休み・観察・身の回り・考えて学ぶ・軽く動く。手順付きの暇つぶしを{catalog.length}件用意しました。</p><button className="weather-button" onClick={()=>{setSource('library');setResult(null);document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}}>おすすめの暇つぶしから選ぶ</button><a className="result-link catalog-browse" href="/ideas">{catalog.length}件から暇つぶしを探す ↗</a></section>
   <EngagementPanel state={engagement} pool={localPool} eligibleIds={favoriteEligibleIds} notice={engagementNotice} onChange={saveEngagement} onFavorites={()=>{changeSource('favorites');document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}} onClear={()=>{if(window.confirm('利用記録と自動調整をリセットしますか？ お気に入りと手動の好みは残ります。'))saveEngagement({...engagementRef.current,learn:false,feedback:[]});}}/>
   <PreferencesPanel onChange={changePreferences}/>
   <BackupPanel actions={actions} preferences={preferences} engagement={engagement} recent={()=>recent.current} ready={ready}/>
   <section id="connections" className="connections"><div className="section-heading"><div><span className="eyebrow">A LITTLE FURTHER</span><h2>外に出る？ 課題を進める？</h2></div><p>つないだ情報も、おまかせ提案に加わります。</p></div><div className="connection-columns"><NearbyPanel onChange={changePlaces}/><CanvasPanel onChange={changeTasks}/></div></section>
   <section className="workspace" id="my-actions"><div className="section-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2>自分の「やってみたい」も追加。</h2></div><p>普段やりたいことは、ここに保存。</p></div><div className="columns">
    <form onSubmit={submit} className="form-card"><h3>{editing?'候補を編集する':'候補をひとつ追加'}</h3><label htmlFor="action-title">何をする？</label><input id="action-title" value={title} onChange={e=>setTitle(e.target.value)} maxLength={80} required placeholder="例：机の上の物を3つ元の場所に戻す"/><div className="form-row"><div><label htmlFor="minutes">目安の時間（分）</label><input id="minutes" type="number" min="1" max="1440" step="1" value={minutes} onChange={e=>setMinutes(e.target.value)} required/></div><div><label htmlFor="place">場所</label><select id="place" value={place} onChange={e=>setPlace(e.target.value as Action['place'])}><option value="indoor">室内</option><option value="outdoor">屋外</option></select></div></div><label htmlFor="note">ひとことメモ（任意）</label><textarea id="note" value={note} onChange={e=>setNote(e.target.value)} maxLength={200} placeholder="例：出したままの文房具を戻す。3つ戻したら終わり。"/><button className="secondary" disabled={!ready}>{editing?'変更を保存':'候補を追加'} <span>＋</span></button>{editing&&<button className="cancel" type="button" onClick={resetForm}>編集をキャンセル</button>}<p className="storage-note">自分の候補はこのブラウザーに保存されます。別端末とは同期しません。</p></form>
-   <div className="list-panel"><div className="list-heading"><h3>あなたの行動リスト</h3><span>{actions.length} IDEAS</span></div>{ready&&actions.length===0?<div className="empty">まだ自分の候補がありません。<br/>画面内の遊びはそのまま利用できます。</div>:actions.map((a,i)=><article className="action" key={a.id}><span className="number">{String(i+1).padStart(2,'0')}</span><div className="action-body"><h4>{a.title}</h4><p>{a.place==='indoor'?'室内':'屋外'} <span>·</span> 約{a.minutes}分</p></div><div className="action-buttons"><button onClick={()=>edit(a)} aria-label={`${a.title}を編集`}>編集</button><button onClick={()=>remove(a)} aria-label={`${a.title}を削除`}>削除</button></div></article>)}</div>
+   <ActionList actions={actions} ready={ready} onEdit={edit} onRemove={remove}/>
   </div></section>
   <p className="status" role="status">{message}</p><footer><span>暇な君へ</span><p>空いた時間を、そのまま楽しく。</p><small>画面内の遊びは外部サービスに接続せず使えます。</small></footer>
  </main>;

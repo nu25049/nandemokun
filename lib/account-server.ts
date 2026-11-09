@@ -11,7 +11,7 @@ export function accountContext(request:NextRequest){
   global:{fetch:(input,init)=>fetch(input,{...init,cache:'no-store',redirect:'error',signal:init?.signal?AbortSignal.any([init.signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000)})},
  }):null;
  function finish(response:NextResponse){for(const [key,value] of Object.entries(PRIVATE_HEADERS))response.headers.set(key,value);for(const cookie of changes)response.cookies.set(cookie.name,cookie.value,cookie.options);return response;}
- return {client,finish,json:(body:unknown,status=200)=>finish(NextResponse.json(body,{status}))};
+ return {client,config,finish,json:(body:unknown,status=200)=>finish(NextResponse.json(body,{status}))};
 }
 export function sameOrigin(request:Request):boolean{return request.headers.get('origin')===new URL(request.url).origin;}
 export async function accountBody(request:Request):Promise<unknown>{const text=await request.text();if(text.length>6000)throw new Error('入力が長すぎます');return JSON.parse(text);}

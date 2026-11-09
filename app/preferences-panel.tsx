@@ -4,10 +4,16 @@ import {CATEGORIES,CATEGORY_LABELS} from '../lib/categories';
 import {defaultPreferences,parsePreferences,PREFERENCES_KEY,type Preferences} from '../lib/preferences';
 type User={id:string;email:string};
 const labels:Record<number,string>={0:'出さない',1:'少なめ',3:'標準',6:'多め'};
+const loginMessages: Record<string, string> = {
+ failed: 'ログインを完了できませんでした。このブラウザーで最初からお試しください。',
+ 'google-failed': 'Googleでのログインを開始できませんでした。もう一度お試しください。',
+ 'google-unavailable': 'Googleでの登録・ログインは接続準備中です。',
+};
 
 export default function PreferencesPanel({onChange}:{onChange:(value:Preferences)=>void}){
  const [prefs,setPrefs]=useState(defaultPreferences);
  const [configured,setConfigured]=useState<boolean|null>(null);
+ const [googleEnabled,setGoogleEnabled]=useState(false);
  const [user,setUser]=useState<User|null>(null);
  const [busy,setBusy]=useState(true);
  const [email,setEmail]=useState('');
@@ -30,6 +36,8 @@ export default function PreferencesPanel({onChange}:{onChange:(value:Preferences
    const data=await response.json();if(id!==requestId.current)return;
    if(!response.ok)throw new Error('ログイン状態を確認できません。端末内の好みは引き続き使えます。');
    setConfigured(data.configured===true);
+   setGoogleEnabled(data.configured===true&&data.googleEnabled===true);
+   const login=new URLSearchParams(window.location.search).get('login');
    const account=data.user&&typeof data.user.id==='string'&&typeof data.user.email==='string'?data.user as User:null;
    setUser(account);localKey.current=account?`${PREFERENCES_KEY}:${account.id}`:PREFERENCES_KEY;
    if(account){
@@ -37,9 +45,9 @@ export default function PreferencesPanel({onChange}:{onChange:(value:Preferences
     const next=data.preferences?parsePreferences(data.preferences):local(localKey.current,fallback);
     apply(next,false);
     try{localStorage.setItem(localKey.current,JSON.stringify(next));}catch{setNotice('端末に設定を保存できません。この画面では調整できます。');}
-    setAccountNotice(data.warning??(data.preferences?'アカウントの好みを読み込みました。':'この端末の好みをアカウントに保存できます。'));
-   }else{apply(local(PREFERENCES_KEY),false);setAccountNotice(new URLSearchParams(window.location.search).get('login')==='failed'?'ログインリンクを確認できませんでした。同じブラウザーで新しいリンクを開いてください。':'');}
-  }catch(error){if(id===requestId.current){setAccountNotice(error instanceof Error?error.message:'接続を確認できませんでした。');setUser(null);localKey.current=PREFERENCES_KEY;apply(local(PREFERENCES_KEY),false);}}
+    setAccountNotice(data.warning??(login==='success'?'ログインしました。アカウントに好みを保存できます。':data.preferences?'アカウントの好みを読み込みました。':'この端末の好みをアカウントに保存できます。'));
+   }else{apply(local(PREFERENCES_KEY),false);setAccountNotice(login&&Object.hasOwn(loginMessages,login)?loginMessages[login]:'');}
+  }catch(error){if(id===requestId.current){setAccountNotice(error instanceof Error?error.message:'接続を確認できませんでした。');setConfigured(null);setGoogleEnabled(false);setUser(null);localKey.current=PREFERENCES_KEY;apply(local(PREFERENCES_KEY),false);}}
   finally{if(id===requestId.current)setBusy(false);}
  }
  useEffect(()=>{apply(local(PREFERENCES_KEY),false);void loadAccount();return()=>{requestId.current++;controller.current?.abort();};},[onChange]);
@@ -70,7 +78,13 @@ export default function PreferencesPanel({onChange}:{onChange:(value:Preferences
    <button className="cancel" disabled={busy} onClick={()=>apply(defaultPreferences())}>提案の傾向を初期値に戻す</button>
    <p className="connection-notice" role="status">{notice}</p>
   </div><div className="preference-card account-card">
-   <h3>{user?'ログイン中':'任意のログイン'}</h3>
+   <h3>{user?'ログイン中':'アカウント作成・ログイン'}</h3>
+   {!user&&<div className="google-account-entry">
+    <p>{googleEnabled?'初めて利用するときは、Googleでのログインと同時にアカウントが作成されます。':'Googleでの登録・ログインは接続準備中です。'}</p>
+    <form action="/api/account/google" method="post">
+     <button className="secondary" type="submit" disabled={busy||!googleEnabled}>Google で登録・ログイン</button>
+    </form>
+   </div>}
    {user?<><p className="account-email">{user.email}</p><p>このアカウントの好みを保存・復元できます。ゲストの設定とは分けて扱います。</p><button className="secondary" disabled={busy} onClick={()=>accountAction('/api/account/preferences',prefs)}>この好みをアカウントに保存</button><button className="weather-button" disabled={busy} onClick={()=>void loadAccount()}>アカウントの好みを読み直す</button><button className="cancel" disabled={busy} onClick={()=>accountAction('/api/account/logout')}>ログアウト</button></>:
     configured===false?<p>ログインは準備中です。今はこの端末に好みを保存できます。ログインしなくても、すべての遊び・提案・候補管理を使えます。</p>:
     configured===true?<><p>メールのリンクでログインすると、自分の好みをアカウントに保存できます。パスワードは不要です。</p><form onSubmit={e=>{e.preventDefault();void accountAction('/api/account/login',{email});}}><label htmlFor="account-email">メールアドレス</label><input id="account-email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={e=>setEmail(e.target.value)} disabled={busy}/><button className="secondary" disabled={busy||cooldown||!email.trim()}>{cooldown?'再送信は少し待ってから':'ログインリンクを受け取る'}</button></form></>:

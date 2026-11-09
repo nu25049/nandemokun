@@ -17,6 +17,7 @@ describe('周辺のお店',()=>{
   expect(result[1].minutes).toBe(result[1].walkMinutes*2+15);
   expect(result[0].url).toBe('https://www.openstreetmap.org/node/1');
   expect(()=>parsePlaces({},35,139)).toThrow();expect(parsePlaces({elements:[]},35,139)).toEqual([]);
+  expect(()=>parsePlaces({elements:[],remark:'runtime error: Query timed out'},35,139)).toThrow();
   expect(distanceMeters(35,139,35,139)).toBe(0);
  });
  it('固定サービスだけに固定範囲の検索を送り、通信失敗を伝える',async()=>{
@@ -30,7 +31,29 @@ describe('周辺のお店',()=>{
   const mock=vi.fn();vi.stubGlobal('fetch',mock);
   expect((await nearbyPost(new Request('https://app.example/api/nearby',{method:'POST',body:'{"latitude":91,"longitude":0}'}))).status).toBe(400);
   expect((await nearbyPost(new Request('https://app.example/api/nearby',{method:'POST',headers:{Origin:'https://evil.example'},body:'{}'}))).status).toBe(403);
+  for(const options of [{radius:3001},{radius:'800'},{category:'__proto__'},{category:'other'}]){
+   const request=new Request('https://app.example/api/nearby',{method:'POST',body:JSON.stringify({latitude:35,longitude:139,...options})});
+   expect((await nearbyPost(request)).status).toBe(400);
+  }
   expect(mock).not.toHaveBeenCalled();
+ });
+ it('指定した半径と種類で検索し、取得した範囲内のお店を近い順で返す',async()=>{
+  const store={id:1,type:'node',lat:35.001,lon:139,tags:{name:'近くのスーパー',shop:'supermarket'}};
+  const bakery={id:2,type:'way',center:{lat:35.01,lon:139},tags:{name:'少し先のパン屋',shop:'bakery'}};
+  const elements=[bakery,{...store,id:3,lat:35.02},store,{...store,id:4,tags:{name:'カフェ',amenity:'cafe'}}];
+  const mock=vi.fn().mockResolvedValue(new Response(JSON.stringify({elements})));
+  vi.stubGlobal('fetch',mock);
+  const request=new Request('https://app.example/api/nearby',{method:'POST',body:JSON.stringify({latitude:35,longitude:139,radius:1500,category:'shopping'})});
+  const response=await nearbyPost(request);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  const {places}=await response.json();
+  expect(places.map((place:{id:string})=>place.id)).toEqual(['node-1','way-2']);
+  expect(places[1].url).toBe('https://www.openstreetmap.org/way/2');
+  const query=mock.mock.calls[0][1].body.get('data');
+  expect(query).toContain('around:1500,35,139');
+  expect(query).toContain('supermarket');
+  expect(query).not.toContain('"amenity"');
  });
 });
 describe('Canvasの読み取り',()=>{

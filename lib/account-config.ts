@@ -1,4 +1,4 @@
-export function accountConfig(env:Record<string,string|undefined>=process.env):{url:string;key:string}|null {
+export function accountConfig(env:Record<string,string|undefined>=process.env):{url:string;key:string;googleEnabled:boolean}|null {
  const url=env.SUPABASE_URL,key=env.SUPABASE_PUBLISHABLE_KEY;
  if(!url||!key||key.startsWith('sb_secret_'))return null;
  try{
@@ -9,6 +9,6 @@ export function accountConfig(env:Record<string,string|undefined>=process.env):{
    const payload=JSON.parse(Buffer.from(key.split('.')[1]??'','base64url').toString('utf8'));
    if(payload.role!=='anon')return null;
   }
-  return {url:parsed.origin,key};
+  return {url:parsed.origin,key,googleEnabled:env.SUPABASE_GOOGLE_ENABLED==='true'};
  }catch{return null;}
 }

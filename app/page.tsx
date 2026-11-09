@@ -100,7 +100,13 @@ export default function Home() {
       {result.game&&<a className="result-link" href={playHref(result.game,result.minutes,timerMode)}>この遊びを大画面で始める ↗</a>}
       {!result.game&&(result.source==='library'||result.source==='saved')&&<a className="result-link" href={'/activity?id='+encodeURIComponent(result.id)}>手順とタイマーを開いて始める ↗</a>}
       <ResultFeedback item={result} state={engagement} outcome={engagement.feedback.find(row=>row.id===resultToken.current)?.outcome} onRate={recordOutcome} onFavorite={()=>saveEngagement(toggleFavorite(engagementRef.current,result))}/>
-     </>:ready&&!eligible.length?<><h2>{emptyMessage}</h2><p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、提案の傾向を初期値に戻してみてください。'}</p><a className="reset-time" href="#preferences">提案の傾向を調整する</a><button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button></>:
+     </>:ready&&!eligible.length?<>
+      <h2>{emptyMessage}</h2>
+      <p>{source==='nearby'?'検索結果の移動時間と滞在時間を見込んで選びます。':source==='canvas'?'下の接続欄から、未提出のToDoを確認できます。':'時間や種類を変えるか、提案の傾向を初期値に戻してみてください。'}</p>
+      {source==='nearby'&&<a className="result-link" href="#nearby">現在地からお店を探す ↗</a>}
+      <a className="reset-time" href="#preferences">提案の傾向を調整する</a>
+      <button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button>
+     </>:
       <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
     </div>
    </div>

@@ -1,7 +1,7 @@
-import type {Action} from './actions';
+import {refreshInitialActions,type Action} from './actions';
 import {recommendations,type Recommendation} from './recommendations';
 export function resolveActivity(id:string,actions:Action[]):Recommendation|null {
- return recommendations(actions,[],[],null,false,'all').find(item=>item.id===id&&(item.source==='library'||item.source==='saved'))??null;
+ return recommendations(refreshInitialActions(actions),[],[],null,false,'all').find(item=>item.id===id&&(item.source==='library'||item.source==='saved'))??null;
 }
 export function activitySteps(note:string):string[]{return note.split(/[。\n]+/).map(step=>step.trim()).filter(Boolean);}
 export type ActivityTimer={duration:number;startedAt:number;elapsed:number;paused:boolean};

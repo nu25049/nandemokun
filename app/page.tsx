@@ -13,6 +13,8 @@ import NearbyPanel from './nearby-panel';
 import CanvasPanel from './canvas-panel';
 import BackupPanel from './backup-panel';
 import ActionList from './action-list';
+import ActivityResume from './activity-resume';
+import {clearActivityProgress} from '../lib/activity-progress';
 import EngagementPanel,{ResultFeedback} from './engagement-panel';
 import {ENGAGEMENT_KEY,emptyEngagement,parseEngagement,rate,toggleFavorite,learningFactors,type Engagement,type Outcome} from '../lib/engagement';
 type HomeSource=Source|'favorites';
@@ -61,7 +63,7 @@ export default function Home() {
  },[]);
  function saveEngagement(next:Engagement){if(source==='favorites')setResult(current=>current&&!next.favorites.includes(current.id)?null:current);engagementRef.current=next;setEngagement(next);try{localStorage.setItem(ENGAGEMENT_KEY,JSON.stringify(next));setEngagementNotice('お気に入り・利用記録をこのブラウザーに保存しました。');}catch{setEngagementNotice('利用記録を端末に保存できませんでした。この画面では使えますが、再読み込みで失われます。');}}
  function recordOutcome(outcome:Outcome){if(result)saveEngagement(rate(engagementRef.current,result,resultToken.current,outcome));}
- function persist(next:Action[]){setActions(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));setMessage('自分の候補をこの端末に保存しました。');}catch{setMessage('端末への保存に失敗しました。再読み込みすると変更が失われる可能性があります。');}}
+ function persist(next:Action[]){setActions(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));setMessage('自分の候補をこの端末に保存しました。');return true;}catch{setMessage('端末への保存に失敗しました。再読み込みすると変更が失われる可能性があります。');return false;}}
  function resetForm(){setEditing(null);setTitle('');setMinutes('15');setPlace('indoor');setNote('');}
  function submit(e:React.FormEvent){
   e.preventDefault();const n=Number(minutes);
@@ -72,7 +74,14 @@ export default function Home() {
   resetForm();
  }
  function edit(a:Action){setEditing(a.id);setTitle(a.title);setMinutes(String(a.minutes));setPlace(a.place);setNote(a.note);document.getElementById('action-title')?.focus();}
- function remove(a:Action){if(!window.confirm(`「${a.title}」を削除しますか？`))return;const next=actions.filter(x=>x.id!==a.id);persist(next);saveEngagement(parseEngagement(JSON.stringify(engagementRef.current),recommendations(next,[],[],null,false,'all')));if(result?.source==='saved'&&result.actionId===a.id)setResult(null);if(editing===a.id)resetForm();}
+ function remove(a:Action){
+  if(!window.confirm(`「${a.title}」を削除しますか？`))return;
+  const next=actions.filter(x=>x.id!==a.id);
+  if(persist(next))try{clearActivityProgress(localStorage,`saved:${a.id}`);}catch{/* 候補がない進行記録は表示されない。 */}
+  saveEngagement(parseEngagement(JSON.stringify(engagementRef.current),recommendations(next,[],[],null,false,'all')));
+  if(result?.source==='saved'&&result.actionId===a.id)setResult(null);
+  if(editing===a.id)resetForm();
+ }
  function changeTime(value:string){setMaxMinutes(value===''?null:Number(value));setResult(null);}
  function changeSource(value:HomeSource){setSource(value);setResult(null);}
  function suggest(){const alternatives=avoidRepeat?eligible.filter(item=>item.id!==result?.id):eligible;const next=pickPersonalized(alternatives.length?alternatives:eligible,preferences,recent.current,Math.random,learningFactors(engagementRef.current));resultToken.current=crypto.randomUUID();setResult(next);if(next){const tracked=rate(engagementRef.current,next,resultToken.current,'pending');if(tracked!==engagementRef.current)saveEngagement(tracked);recent.current=[...recent.current,next.id].slice(-20);try{localStorage.setItem(HISTORY_KEY,JSON.stringify(recent.current.filter(id=>!id.startsWith('nearby:')&&!id.startsWith('canvas:'))));}catch{/* 履歴の保存失敗でも提案は続ける。 */}}setMessage(next?'空き時間と好みに合う候補を選びました。':'条件や提案の傾向を確認してください。');}
@@ -95,6 +104,7 @@ export default function Home() {
       <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
     </div>
    </div>
+   <ActivityResume actions={actions} ready={ready} feedback={engagement.feedback}/>
    <div className="dashboard-bottom">
     <section className="dashboard-options" aria-labelledby="options-title"><span className="eyebrow">YOUR OPTIONS</span><h2 id="options-title">提案のオプション</h2>
     <div className="suggestion-options">

@@ -63,8 +63,8 @@ export async function fetchPlaces(latitude:number, longitude:number, signal?:Abo
   const values = matchingTags.filter(tag => tag.key===key).map(tag => tag.value);
   return values.length ? [`nwr["${key}"~"^(${values.join('|')})$"](${around});`] : [];
  });
- const query=`[out:json][timeout:12][maxsize:16777216];(${selectors.join('')});out center 500;`;
- const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'Himanakimihe/0.1 (https://softwearcreationwhatdo.vercel.app)'},body:new URLSearchParams({data:query}),signal,cache:'no-store',redirect:'error'});
+ const query=`[out:json][timeout:12];(${selectors.join('')});out center 500;`;
+ const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':'Himanakimihe/0.1 (https://softwearcreationwhatdo.vercel.app)'},body:new URLSearchParams({data:query}),signal,cache:'no-store',redirect:'error'});
  if (!response.ok) throw new Error('お店の検索サービスが混み合っています。少し待ってから試してください。');
  return parsePlaces(await response.json(), point.latitude, point.longitude, validated);
 }

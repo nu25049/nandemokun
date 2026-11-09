@@ -2,6 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {coordinates,DEFAULT_NEARBY_OPTIONS,NEARBY_CATEGORIES,NEARBY_RADII,type NearbyPlace,type NearbySearchOptions} from '../lib/nearby';
 
+const mapQueries={all:'近くのお店',cafe:'近くのカフェ',food:'近くの飲食店',shopping:'近くのスーパー・コンビニ'};
+
 function radiusLabel(radius:NearbySearchOptions['radius']) {
  return radius<1000?`${radius}m`:`${radius/1000}km`;
 }
@@ -81,6 +83,7 @@ export default function NearbyPanel({onChange}:{onChange:(places:NearbyPlace[])=
   {(places.length>0||busy)&&<button className="cancel" onClick={clear}>{busy?'検索をやめる':'お店の候補を解除'}</button>}
   <p className="connection-notice" role="status">{notice}</p>
   {places.length>0&&<ul className="connection-list">{places.map(place=><li key={place.id}><a href={place.url} target="_blank" rel="noopener noreferrer">{place.name} ↗</a><span>{place.category}・直線約{place.distance}m・徒歩片道約{place.walkMinutes}分・往復と滞在で約{place.minutes}分</span></li>)}</ul>}
+  {!places.length&&!busy&&<p><a href={'https://www.google.com/maps/search/?'+new URLSearchParams({api:'1',query:mapQueries[options.category]})} target="_blank" rel="noopener noreferrer">Google マップで近くのお店を探す ↗</a></p>}
   <p className="connection-note">検索時だけ、丸めた現在地を当サイトとOpenStreetMapの検索サービスに送ります。位置や結果はこのブラウザーに保存しません。徒歩時間は直線距離からの概算で、営業中かは未確認です。</p>
   <a className="weather-source" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
  </div>;

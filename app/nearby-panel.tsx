@@ -79,12 +79,13 @@ export default function NearbyPanel({onChange}:{onChange:(places:NearbyPlace[])=
     {Object.entries(NEARBY_CATEGORIES).map(([category,label])=><option key={category} value={category}>{label}</option>)}
    </select>
   </div>
+  <p className="connection-note">検索を押すと、Private.coffeeにおおまかな検索範囲を送り、当サイトで現在地からの距離を計算します。<a href="https://overpass.private.coffee/#privacy-policy" target="_blank" rel="noopener noreferrer">Private.coffeeのプライバシーポリシー</a></p>
   <button className="secondary" onClick={search} disabled={busy||cooldown}>{busy?'お店を検索中…':cooldown?'30秒待ってから再検索':'近くのお店を調べる'}</button>
   {(places.length>0||busy)&&<button className="cancel" onClick={clear}>{busy?'検索をやめる':'お店の候補を解除'}</button>}
   <p className="connection-notice" role="status">{notice}</p>
   {places.length>0&&<ul className="connection-list">{places.map(place=><li key={place.id}><a href={place.url} target="_blank" rel="noopener noreferrer">{place.name} ↗</a><span>{place.category}・直線約{place.distance}m・徒歩片道約{place.walkMinutes}分・往復と滞在で約{place.minutes}分</span></li>)}</ul>}
   {!places.length&&!busy&&<p><a href={'https://www.google.com/maps/search/?'+new URLSearchParams({api:'1',query:mapQueries[options.category]})} target="_blank" rel="noopener noreferrer">Google マップで近くのお店を探す ↗</a></p>}
-  <p className="connection-note">検索時だけ、丸めた現在地を当サイトとOpenStreetMapの検索サービスに送ります。位置や結果はこのブラウザーに保存しません。徒歩時間は直線距離からの概算で、営業中かは未確認です。</p>
+  <p className="connection-note">徒歩時間は直線距離からの目安です。営業時間は地図で確認できます。</p>
   <a className="weather-source" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
  </div>;
 }

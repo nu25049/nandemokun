@@ -20,11 +20,14 @@ describe('周辺のお店',()=>{
   expect(()=>parsePlaces({elements:[],remark:'runtime error: Query timed out'},35,139)).toThrow();
   expect(distanceMeters(35,139,35,139)).toBe(0);
  });
- it('固定サービスだけに固定範囲の検索を送り、通信失敗を伝える',async()=>{
+ it('外部提供元へ共有区画の検索範囲を送り、通信失敗を伝える',async()=>{
   const mock=vi.fn().mockResolvedValue(new Response(JSON.stringify({elements:[]})));
-  vi.stubGlobal('fetch',mock);expect(await fetchPlaces(35,139)).toEqual([]);
-  expect(mock.mock.calls[0][0]).toBe('https://overpass-api.de/api/interpreter');
-  expect(mock.mock.calls[0][1].body.get('data')).toContain('around:800,35,139');
+  vi.stubGlobal('fetch',mock);expect(await fetchPlaces(35.6812,139.7666)).toEqual([]);
+  expect(mock.mock.calls[0][0]).toBe('https://overpass.private.coffee/api/interpreter');
+  const query = mock.mock.calls[0][1].body.get('data');
+  expect(query).toContain('around:1600,35.68,139.77');
+  expect(query).not.toContain('35.6812');
+  expect(query).not.toContain('139.7666');
   mock.mockResolvedValue(new Response('',{status:429}));await expect(fetchPlaces(35,139)).rejects.toThrow();
  });
  it('APIは不正座標と別サイトからの要求を外部送信前に拒否する',async()=>{
@@ -51,7 +54,7 @@ describe('周辺のお店',()=>{
   expect(places.map((place:{id:string})=>place.id)).toEqual(['node-1','way-2']);
   expect(places[1].url).toBe('https://www.openstreetmap.org/way/2');
   const query=mock.mock.calls[0][1].body.get('data');
-  expect(query).toContain('around:1500,35,139');
+  expect(query).toContain('around:2300,35,139');
   expect(query).toContain('supermarket');
   expect(query).not.toContain('"amenity"');
  });

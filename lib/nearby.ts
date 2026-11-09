@@ -3,6 +3,7 @@ export const NEARBY_RADII = [800, 1500, 3000] as const;
 export const NEARBY_CATEGORIES = {all:'すべて', cafe:'カフェ', food:'飲食店', shopping:'買い物'} as const;
 export type NearbySearchOptions = {radius:typeof NEARBY_RADII[number];category:keyof typeof NEARBY_CATEGORIES};
 export const DEFAULT_NEARBY_OPTIONS: NearbySearchOptions = {radius:800, category:'all'};
+const OVERPASS_URL = 'https://overpass.private.coffee/api/interpreter';
 
 const storeTags = [
  {key:'amenity', value:'cafe', category:'cafe', label:'カフェ'},
@@ -57,14 +58,28 @@ export function parsePlaces(raw:unknown, latitude:number, longitude:number, opti
 export async function fetchPlaces(latitude:number, longitude:number, signal?:AbortSignal, options:NearbySearchOptions=DEFAULT_NEARBY_OPTIONS):Promise<NearbyPlace[]> {
  const point=coordinates(latitude,longitude);
  const validated = parseNearbyOptions(options.radius, options.category);
- const around=`around:${validated.radius},${point.latitude},${point.longitude}`;
+ // 0.01度の共有区画を使う。区画中心からのずれは最大約787mなので、800m広げて取得する。
+ const latitudeCell = Number(point.latitude.toFixed(2));
+ const longitudeCell = Number(point.longitude.toFixed(2));
+ const around = `around:${validated.radius + 800},${latitudeCell},${longitudeCell}`;
  const matchingTags = storeTags.filter(tag => validated.category==='all' || tag.category===validated.category);
  const selectors = ['amenity','shop'].flatMap(key => {
   const values = matchingTags.filter(tag => tag.key===key).map(tag => tag.value);
   return values.length ? [`nwr["${key}"~"^(${values.join('|')})$"](${around});`] : [];
  });
  const query=`[out:json][timeout:12];(${selectors.join('')});out center 500;`;
- const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':'Himanakimihe/0.1 (https://softwearcreationwhatdo.vercel.app)'},body:new URLSearchParams({data:query}),signal,cache:'no-store',redirect:'error'});
+ const response = await fetch(OVERPASS_URL, {
+  method: 'POST',
+  headers: {
+   Accept: 'application/json',
+   'Content-Type': 'application/x-www-form-urlencoded',
+   'User-Agent': 'Himanakimihe/0.1 (https://softwearcreationwhatdo.vercel.app)',
+  },
+  body: new URLSearchParams({data:query}),
+  signal,
+  cache: 'no-store',
+  redirect: 'error',
+ });
  if (!response.ok) throw new Error('お店の検索サービスが混み合っています。少し待ってから試してください。');
  return parsePlaces(await response.json(), point.latitude, point.longitude, validated);
 }

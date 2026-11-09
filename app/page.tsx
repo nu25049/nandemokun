@@ -6,7 +6,8 @@ import type {NearbyPlace} from '../lib/nearby';
 import type {CanvasTask} from '../lib/canvas';
 import WeatherPanel from './weather-panel';
 import {DEFAULT_PLAY_MINUTES,GAME_LABELS,playHref,QUESTION_COUNTS,type GameKind,type TimerMode} from '../lib/play';
-import {catalog} from '../lib/catalog';
+import {isDiscreetRecommendation} from '../lib/discreet';
+import {GAME_PROGRESS_KEY,gameLevel,readGameProgress,type GameProgress} from '../lib/game-progress';
 import {defaultPreferences,HISTORY_KEY,parseRecent,pickPersonalized,visibleRecommendations,type Preferences} from '../lib/preferences';
 import PreferencesPanel from './preferences-panel';
 import NearbyPanel from './nearby-panel';
@@ -18,6 +19,17 @@ import {clearActivityProgress} from '../lib/activity-progress';
 import EngagementPanel,{ResultFeedback} from './engagement-panel';
 import {ENGAGEMENT_KEY,emptyEngagement,parseEngagement,rate,toggleFavorite,learningFactors,type Engagement,type Outcome} from '../lib/engagement';
 type HomeSource=Source|'favorites';
+const DISCREET_KEY='himanakimihe.discreet.v1';
+const HOME_VIEWS=[
+ {id:'home',label:'ホーム'},
+ {id:'options',label:'提案の条件'},
+ {id:'games',label:'ほかのゲーム'},
+ {id:'activity',label:'お気に入り・利用記録'},
+ {id:'preferences',label:'好み・ログイン'},
+ {id:'connections',label:'近くのお店・Canvas'},
+ {id:'my-actions',label:'自分の候補'},
+ {id:'backup',label:'データのバックアップ'},
+] as const;
 
 export default function Home() {
  const [actions,setActions]=useState<Action[]>([]);
@@ -39,6 +51,12 @@ export default function Home() {
  const [avoidRepeat,setAvoidRepeat]=useState(false);
  const [indoorOnly,setIndoorOnly]=useState(false);
  const [preferences,setPreferences]=useState(defaultPreferences);
+ const [hash,setHash]=useState('');
+ const [discreet,setDiscreet]=useState(false);
+ const [gameProgress,setGameProgress]=useState<GameProgress>({totalScore:0,bestTap:0});
+ const menu=useRef<HTMLDetailsElement>(null);
+ const activeView=hash==='#nearby'?'connections':HOME_VIEWS.find(entry=>`#${entry.id}`===hash)?.id??'home';
+ const level=gameLevel(gameProgress.totalScore);
  const recent=useRef<string[]>([]);
  const [engagement,setEngagement]=useState(emptyEngagement);
  const engagementRef=useRef(engagement);
@@ -49,9 +67,27 @@ export default function Home() {
  const changePlaces=useCallback((next:NearbyPlace[])=>{setPlaces(next);setResult(current=>current?.source==='nearby'?null:current);},[]);
  const changeTasks=useCallback((next:CanvasTask[])=>{setTasks(next);setResult(current=>current?.source==='canvas'?null:current);},[]);
  const localPool=recommendations(actions,[],[],null,false,'all').map(item=>item.game?{...item,title:GAME_LABELS[item.game]+'で遊ぶ'}:item);
- const eligibleAll=visibleRecommendations(recommendations(actions,places,tasks,maxMinutes,indoorOnly,source==='favorites'?'all':source),preferences);
+ const eligibleAll=visibleRecommendations(recommendations(actions,places,tasks,maxMinutes,indoorOnly,source==='favorites'?'all':source),preferences).filter(item=>!discreet||isDiscreetRecommendation(item));
  const eligible=source==='favorites'?eligibleAll.filter(item=>engagement.favorites.includes(item.id)):eligibleAll;
- const favoriteEligibleIds=new Set(visibleRecommendations(recommendations(actions,[],[],maxMinutes,indoorOnly,'all'),preferences).map(item=>item.id));
+ const favoriteEligibleIds=new Set(visibleRecommendations(recommendations(actions,[],[],maxMinutes,indoorOnly,'all'),preferences).filter(item=>!discreet||isDiscreetRecommendation(item)).map(item=>item.id));
+ useEffect(()=>{
+  function syncView(){setHash(window.location.hash);if(menu.current)menu.current.open=false;}
+  function syncScore(){setGameProgress(readGameProgress());}
+  function storage(event:StorageEvent){if(event.key===GAME_PROGRESS_KEY||event.key===null)syncScore();}
+  syncView();syncScore();
+  window.addEventListener('hashchange',syncView);
+  window.addEventListener('pageshow',syncScore);
+  window.addEventListener('storage',storage);
+  return()=>{
+   window.removeEventListener('hashchange',syncView);
+   window.removeEventListener('pageshow',syncScore);
+   window.removeEventListener('storage',storage);
+  };
+ },[]);
+ useEffect(()=>{
+  if(hash==='#nearby')document.getElementById('nearby')?.scrollIntoView({block:'start'});
+  else window.scrollTo({top:0,behavior:'instant'});
+ },[hash]);
  useEffect(()=>{
   let loaded:Action[]=[];
   try {const raw=localStorage.getItem(STORAGE_KEY);loaded=raw===null?initialActions:refreshInitialActions(parseActions(raw));setActions(loaded);}
@@ -60,6 +96,7 @@ export default function Home() {
   catch{setEngagementNotice('利用記録を読み込めませんでした。初期状態で続けられます。新しい操作で再保存できます。');}
   setReady(true);
   try{recent.current=parseRecent(localStorage.getItem(HISTORY_KEY));}catch{recent.current=[];}
+  try{setDiscreet(localStorage.getItem(DISCREET_KEY)==='1');}catch{/* この画面で切り替えられる。 */}
  },[]);
  function saveEngagement(next:Engagement){if(source==='favorites')setResult(current=>current&&!next.favorites.includes(current.id)?null:current);engagementRef.current=next;setEngagement(next);try{localStorage.setItem(ENGAGEMENT_KEY,JSON.stringify(next));setEngagementNotice('お気に入り・利用記録をこのブラウザーに保存しました。');}catch{setEngagementNotice('利用記録を端末に保存できませんでした。この画面では使えますが、再読み込みで失われます。');}}
  function recordOutcome(outcome:Outcome){if(result)saveEngagement(rate(engagementRef.current,result,resultToken.current,outcome));}
@@ -84,15 +121,57 @@ export default function Home() {
  }
  function changeTime(value:string){setMaxMinutes(value===''?null:Number(value));setResult(null);}
  function changeSource(value:HomeSource){setSource(value);setResult(null);}
+ function changeDiscreet(value:boolean){
+  if(value===discreet)return;
+  setDiscreet(value);
+  setResult(null);
+  if(value&&['saved','nearby','canvas'].includes(source))setSource('all');
+  try{localStorage.setItem(DISCREET_KEY,value?'1':'0');}catch{/* 現在の画面には反映する。 */}
+ }
  function suggest(){const alternatives=avoidRepeat?eligible.filter(item=>item.id!==result?.id):eligible;const next=pickPersonalized(alternatives.length?alternatives:eligible,preferences,recent.current,Math.random,learningFactors(engagementRef.current));resultToken.current=crypto.randomUUID();setResult(next);if(next){const tracked=rate(engagementRef.current,next,resultToken.current,'pending');if(tracked!==engagementRef.current)saveEngagement(tracked);recent.current=[...recent.current,next.id].slice(-20);try{localStorage.setItem(HISTORY_KEY,JSON.stringify(recent.current.filter(id=>!id.startsWith('nearby:')&&!id.startsWith('canvas:'))));}catch{/* 履歴の保存失敗でも提案は続ける。 */}}setMessage(next?'空き時間と好みに合う候補を選びました。':'条件や提案の傾向を確認してください。');}
- const emptyMessage=source==='favorites'?'今の条件に合うお気に入りがありません':source==='nearby'?(places.length?'この時間に収まるお店がありません':'先に近くのお店を調べよう'):source==='canvas'?'Canvasの課題を取得してみよう':source==='saved'&&!actions.length?'自分の候補を追加しよう':'この条件に合う候補がありません';
- return <main>
-  <header><a className="brand" href="/">暇な君へ<span className="brand-dot">●</span></a><nav className="header-links"><a className="nav" href="#preferences">好み・ログイン</a><a className="nav" href="#activity">利用記録</a><a className="nav" href="#connections">お店・課題</a><a className="nav" href="#my-actions">自分の候補 ↗</a></nav></header>
-  <section className="home-dashboard" aria-label="次の行動を提案">
+ const emptyMessage=source==='favorites'?'今の条件に合うお気に入りがありません':discreet?'今の条件で目立ちにくい候補がありません':source==='nearby'?(places.length?'この時間に収まるお店がありません':'先に近くのお店を調べよう'):source==='canvas'?'Canvasの課題を取得してみよう':source==='saved'&&!actions.length?'自分の候補を追加しよう':'この条件に合う候補がありません';
+ return <main className="app-home">
+  <header className="home-header">
+   <a className="brand" href="#home">暇な君へ<span className="brand-dot">●</span></a>
+   <div className="home-header-actions">
+    <span className="home-level">Lv. {level.level}</span>
+    <details className="home-menu" ref={menu} onKeyDown={event=>{
+     if(event.key==='Escape'&&menu.current?.open){menu.current.open=false;menu.current.querySelector('summary')?.focus();}
+    }}>
+     <summary><span aria-hidden="true">☰</span> メニュー</summary>
+     <nav aria-label="メインメニュー">
+      {HOME_VIEWS.map(entry=><a key={entry.id} href={`#${entry.id}`} aria-current={activeView===entry.id?'page':undefined} onClick={()=>{if(menu.current)menu.current.open=false;}}>{entry.label}</a>)}
+      <a href="/ideas">カタログから探す ↗</a>
+     </nav>
+    </details>
+   </div>
+  </header>
+  <section id="home" className="home-dashboard" hidden={activeView!=='home'} aria-label="次の行動を提案">
+   <div className="quick-start-card">
+    <div className="quick-start-copy">
+     <span className="quick-start-tag">スマホでさくっと</span>
+     <h1>30秒タップ</h1>
+     <p>出てきた形をポチポチ。正解で＋10点。</p>
+     <div className="home-progress">
+      <span>累計 {gameProgress.totalScore.toLocaleString('ja-JP')} 点</span>
+      <span>次のLv.まで {level.perLevel-level.intoLevel} 点</span>
+      <progress aria-label="次のレベルまでの進み具合" value={level.intoLevel} max={level.perLevel}/>
+     </div>
+    </div>
+    <div className="quick-start-actions">
+     <a className="quick-tap-link" href="/tap">30秒タップで遊ぶ <span aria-hidden="true">↗</span></a>
+     <a className="home-text-link" href="#games">ほかのゲーム</a>
+    </div>
+   </div>
    <div className="suggestion proposal-card">
-    <div className="card-top"><span>YOUR NEXT MOVE</span><span className="pill">{ready?`${eligible.length}件から提案`:'読み込み中'}</span></div>
-    <h1>空いた時間、<em>何しよう？</em></h1>
-    <button className="primary propose-button" disabled={!ready||!eligible.length} onClick={suggest}>{result?'もうひとつ提案して':'いま、何しよう？'} <span>↗</span></button>
+    <div className="proposal-heading"><h2>暇つぶしを提案</h2><span className="pill">{ready?`${eligible.length}件から提案`:'読み込み中'}</span></div>
+    <fieldset className="discreet-options">
+     <legend>人目が気になる？</legend>
+     <button type="button" aria-pressed={discreet} onClick={()=>changeDiscreet(true)}>気になる</button>
+     <button type="button" aria-pressed={!discreet} onClick={()=>changeDiscreet(false)}>気にしない</button>
+    </fieldset>
+    {discreet&&<p className="discreet-hint">座ったまま、音を出さずにできる候補を提案します。</p>}
+    <button className="primary propose-button" disabled={!ready||!eligible.length} onClick={suggest}>{result?'もうひとつ提案して':'いま、何しよう？'} <span aria-hidden="true">↗</span></button>
     <div className="result" aria-live="polite">
      {result?<><div className="result-meta">{result.place==='indoor'?'室内で':'外に出て'} · 約{result.minutes}分</div><h2>{result.title}</h2>{result.note&&<p>{result.game?'下のボタンで専用画面へ。問題に集中して遊べます。':result.note}</p>}
       {result.dueAt&&<p className="task-due">期限：{new Date(result.dueAt).toLocaleString('ja-JP')}</p>}
@@ -107,21 +186,22 @@ export default function Home() {
       <a className="reset-time" href="#preferences">提案の傾向を調整する</a>
       <button className="reset-time" onClick={()=>{setSource('play');setResult(null);}}>画面内の遊びにする</button>
      </>:
-      <p className="proposal-hint">ボタンを押せば、次にすることをひとつ提案。<br/>条件を変えるなら左下、すぐ遊ぶなら右下へ。</p>}
+      null}
     </div>
+    <div className="home-proposal-links"><a className="home-text-link" href="#options">提案の条件</a><a className="home-text-link" href="/ideas">カタログから探す</a></div>
    </div>
    <ActivityResume actions={actions} ready={ready} feedback={engagement.feedback}/>
-   <div className="dashboard-bottom">
-    <section className="dashboard-options" aria-labelledby="options-title"><span className="eyebrow">YOUR OPTIONS</span><h2 id="options-title">提案のオプション</h2>
+  </section>
+    <section id="options" className="dashboard-options home-secondary-view" hidden={activeView!=='options'} aria-labelledby="options-title"><h2 id="options-title">提案の条件</h2>
     <div className="suggestion-options">
      <label htmlFor="available-time">使える時間</label><select id="available-time" value={maxMinutes??''} onChange={e=>changeTime(e.target.value)} disabled={!ready}><option value="1">1分</option><option value="3">3分</option><option value="5">5分</option><option value="10">10分</option><option value="15">15分</option><option value="30">30分</option><option value="60">60分</option><option value="">時間を指定しない</option></select>
-     <label htmlFor="suggestion-source">何系にする？</label><select id="suggestion-source" value={source} onChange={e=>changeSource(e.target.value as HomeSource)} disabled={!ready}><option value="all">おまかせ</option><option value="play">画面内のゲーム</option><option value="library">おすすめの暇つぶし</option><option value="saved">自分の候補</option><option value="favorites">お気に入り</option><option value="nearby">近くのお店</option><option value="canvas">Canvasの課題</option></select>
+     <label htmlFor="suggestion-source">何系にする？</label><select id="suggestion-source" value={source} onChange={e=>changeSource(e.target.value as HomeSource)} disabled={!ready}><option value="all">おまかせ</option><option value="play">画面内のゲーム</option><option value="library">おすすめの暇つぶし</option><option value="saved" disabled={discreet}>自分の候補</option><option value="favorites">お気に入り</option><option value="nearby" disabled={discreet}>近くのお店</option><option value="canvas" disabled={discreet}>Canvasの課題</option></select>
      <label className="repeat-option"><input type="checkbox" checked={avoidRepeat} onChange={e=>setAvoidRepeat(e.target.checked)} disabled={!ready}/>同じ候補の連続を避ける</label>
      <p className="eligible-count" aria-live="polite">{ready?`提案できる候補：${eligible.length}件`:'候補を読み込み中'}{avoidRepeat&&eligible.length===1?'（1件のため同じ候補を提案します）':''}</p>
      <details className="weather-details"><summary>天気・場所の条件</summary><WeatherPanel indoorOnly={indoorOnly} onChange={changePlace} disabled={!ready}/></details>
     </div>
-    <p className="dashboard-note">お店や課題の接続は、この下から。</p></section>
-    <section className="play-launcher" aria-labelledby="play-title"><span className="eyebrow">JUST PLAY</span><h2 id="play-title">頭を動かして、暇つぶし。</h2><p>通常は30分から。短時間なら別タブへ。<br/>計算もクイズも、正解したらすぐ次へ。</p>
+    <a className="home-text-link" href="#home">ホームへ戻る</a></section>
+    <section id="games" className="play-launcher home-secondary-view" hidden={activeView!=='games'} aria-labelledby="play-title"><h2 id="play-title">ほかのゲーム</h2><p>計算やクイズでも、正解するたびにスコアが増えます。</p>
      <label htmlFor="game-kind">遊びの種類</label><select id="game-kind" value={gameKind} onChange={e=>setGameKind(e.target.value as GameKind)} disabled={!ready}>{Object.entries(GAME_LABELS).map(([kind,label])=><option key={kind} value={kind}>{label}</option>)}</select>
      <p className="content-count">なぞなぞ{QUESTION_COUNTS.riddle}問・数列{QUESTION_COUNTS.sequence}問・ことば{QUESTION_COUNTS.word}問。1回のプレイでは一巡するまで同じ問題を出しません。</p>
      <label htmlFor="timer-mode">タイマーの方式</label><select id="timer-mode" value={timerMode} onChange={e=>setTimerMode(e.target.value as TimerMode)} disabled={!ready}><option value="down">カウントダウン</option><option value="up">カウントアップ</option></select>
@@ -130,17 +210,14 @@ export default function Home() {
      <p className="dashboard-note">遊ぶ画面では、戻る操作と回答だけ。</p>
      <div className="quick-play"><h3>1〜3分だけ遊ぶ</h3><p>選んだ種類を、新しいタブで開きます。</p><div className="quick-play-links">{[1,2,3].map(n=><a key={n} href={playHref(gameKind,n,'down')} target="_blank" rel="noopener noreferrer" aria-label={`${n}分の暇つぶしを別タブで開く`}>{n}分 <span aria-hidden="true">↗</span></a>)}</div></div>
     </section>
-   </div>
-  </section>
-  <section className="catalog-preview"><h2>お題探しも、おまかせ。</h2><p>作って遊ぶ・ひと休み・観察・身の回り・考えて学ぶ・軽く動く。手順付きの暇つぶしを{catalog.length}件用意しました。</p><button className="weather-button" onClick={()=>{setSource('library');setResult(null);document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}}>おすすめの暇つぶしから選ぶ</button><a className="result-link catalog-browse" href="/ideas">{catalog.length}件から暇つぶしを探す ↗</a></section>
-  <EngagementPanel state={engagement} pool={localPool} eligibleIds={favoriteEligibleIds} notice={engagementNotice} onChange={saveEngagement} onFavorites={()=>{changeSource('favorites');document.querySelector('.propose-button')?.scrollIntoView({behavior:'smooth',block:'center'});}} onClear={()=>{if(window.confirm('利用記録と自動調整をリセットしますか？ お気に入りと手動の好みは残ります。'))saveEngagement({...engagementRef.current,learn:false,feedback:[]});}}/>
-  <PreferencesPanel onChange={changePreferences}/>
-  <BackupPanel actions={actions} preferences={preferences} engagement={engagement} recent={()=>recent.current} ready={ready}/>
-  <section id="connections" className="connections"><div className="section-heading"><div><span className="eyebrow">A LITTLE FURTHER</span><h2>外に出る？ 課題を進める？</h2></div><p>つないだ情報も、おまかせ提案に加わります。</p></div><div className="connection-columns"><NearbyPanel onChange={changePlaces}/><CanvasPanel onChange={changeTasks}/></div></section>
-  <section className="workspace" id="my-actions"><div className="section-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2>自分の「やってみたい」も追加。</h2></div><p>普段やりたいことは、ここに保存。</p></div><div className="columns">
+  <div hidden={activeView!=='activity'}><EngagementPanel state={engagement} pool={localPool} eligibleIds={favoriteEligibleIds} notice={engagementNotice} onChange={saveEngagement} onFavorites={()=>{changeSource('favorites');window.location.hash='home';}} onClear={()=>{if(window.confirm('利用記録と自動調整をリセットしますか？ お気に入りと手動の好みは残ります。'))saveEngagement({...engagementRef.current,learn:false,feedback:[]});}}/></div>
+  <div hidden={activeView!=='preferences'}><PreferencesPanel onChange={changePreferences}/></div>
+  <div hidden={activeView!=='backup'}><BackupPanel actions={actions} preferences={preferences} engagement={engagement} recent={()=>recent.current} ready={ready}/></div>
+  <section id="connections" className="connections" hidden={activeView!=='connections'}><div className="section-heading"><div><span className="eyebrow">A LITTLE FURTHER</span><h2>外に出る？ 課題を進める？</h2></div><p>つないだ情報も、おまかせ提案に加わります。</p></div><div className="connection-columns"><NearbyPanel onChange={changePlaces}/><CanvasPanel onChange={changeTasks}/></div></section>
+  <section className="workspace" id="my-actions" hidden={activeView!=='my-actions'}><div className="section-heading"><div><span className="eyebrow">MAKE IT YOURS</span><h2>自分の「やってみたい」も追加。</h2></div><p>普段やりたいことは、ここに保存。</p></div><div className="columns">
    <form onSubmit={submit} className="form-card"><h3>{editing?'候補を編集する':'候補をひとつ追加'}</h3><label htmlFor="action-title">何をする？</label><input id="action-title" value={title} onChange={e=>setTitle(e.target.value)} maxLength={80} required placeholder="例：机の上の物を3つ元の場所に戻す"/><div className="form-row"><div><label htmlFor="minutes">目安の時間（分）</label><input id="minutes" type="number" min="1" max="1440" step="1" value={minutes} onChange={e=>setMinutes(e.target.value)} required/></div><div><label htmlFor="place">場所</label><select id="place" value={place} onChange={e=>setPlace(e.target.value as Action['place'])}><option value="indoor">室内</option><option value="outdoor">屋外</option></select></div></div><label htmlFor="note">ひとことメモ（任意）</label><textarea id="note" value={note} onChange={e=>setNote(e.target.value)} maxLength={200} placeholder="例：出したままの文房具を戻す。3つ戻したら終わり。"/><button className="secondary" disabled={!ready}>{editing?'変更を保存':'候補を追加'} <span>＋</span></button>{editing&&<button className="cancel" type="button" onClick={resetForm}>編集をキャンセル</button>}<p className="storage-note">自分の候補はこのブラウザーに保存されます。別端末とは同期しません。</p></form>
    <ActionList actions={actions} ready={ready} onEdit={edit} onRemove={remove}/>
   </div></section>
-  <p className="status" role="status">{message}</p><footer><span>暇な君へ</span><p>空いた時間を、そのまま楽しく。</p><small>画面内の遊びは外部サービスに接続せず使えます。</small></footer>
+  {message&&<p className="status" role="status">{message}</p>}
  </main>;
 }

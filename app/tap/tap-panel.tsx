@@ -40,7 +40,8 @@ export default function TapPanel(){
  const [round,setRound]=useState<Round|null>(null);
  const [seconds,setSeconds]=useState(ROUND_SECONDS);
  const [feedback,setFeedback]=useState('');
- const [progress,setProgress]=useState<GameProgress>({totalScore:0,bestTap:0});
+ const [loadedProgress,setProgress]=useState<GameProgress|null>(null);
+ const progress=loadedProgress??{totalScore:0,bestTap:0};
  const activeRound=useRef<Round|null>(null);
  const turnId=useRef(0);
  const firstChoice=useRef<HTMLButtonElement>(null);
@@ -132,7 +133,7 @@ export default function TapPanel(){
    </dl>
    {!round?<>
     <p className="tap-prompt">表示された形と同じボタンをタップ。正解するたびに10点です。</p>
-    <button className="tap-start" type="button" onKeyDown={ignoreHeldKey} onClick={start}>30秒スタート</button>
+    <button className="tap-start" type="button" disabled={!loadedProgress} onKeyDown={ignoreHeldKey} onClick={start}>30秒スタート</button>
    </>:round.finished?<div className="tap-result">
     <h2>30秒終了</h2>
     <p><strong>{round.score}</strong>点・{round.score/CORRECT_POINTS}回正解</p>

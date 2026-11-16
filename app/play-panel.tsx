@@ -6,6 +6,7 @@ import {addGameScore,GAME_PROGRESS_KEY,gameLevel,readGameProgress} from '../lib/
 const correctAnswerPoints = 10;
 
 export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:number;mode:TimerMode}) {
+ const isTrivia=kind==='trivia';
  const [question,setQuestion]=useState<Question|null>(null);
  const [answer,setAnswer]=useState('');
  const [feedback,setFeedback]=useState<boolean|null>(null);
@@ -49,11 +50,11 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
   locked.current=false;
   if(!question||ended)return;
   if(kind==='calculation')input.current?.focus();
-  if(kind==='trivia'&&seen.current.length>1&&document.activeElement===document.body)triviaFirstChoice.current?.focus({preventScroll:true});
- },[kind,question,ended]);
+  if(isTrivia&&seen.current.length>1&&document.activeElement===document.body)triviaFirstChoice.current?.focus({preventScroll:true});
+ },[kind,isTrivia,question,ended]);
  useEffect(()=>{
-  if(kind==='trivia'&&feedback===false&&!ended)triviaNextButton.current?.focus();
- },[kind,feedback,ended]);
+  if(isTrivia&&feedback===false&&!ended)triviaNextButton.current?.focus();
+ },[isTrivia,feedback,ended]);
 
  function recordCorrectAnswer() {
   locked.current=true;
@@ -74,8 +75,8 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
    } else if(explicit){setAnnouncement('もう一度。答えを入力し直してください。');input.current?.select();}
   } else {
    selected.current=null;setSelectedChoice(null);
-   if(correct){recordCorrectAnswer();setLastExplanation(question.explanation);setFeedback(null);setQuestion(draw());}
-   else if(kind==='trivia'){
+   if(correct){recordCorrectAnswer();setLastExplanation(question.explanation);setFeedback(isTrivia?true:null);setQuestion(draw());}
+   else if(isTrivia){
     locked.current=true;
     setFeedback(false);
     setLastExplanation(question.explanation);
@@ -98,15 +99,29 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
   <section className="focus-stage" aria-label={GAME_LABELS[kind]}>
    <div className="game-clock" aria-live="off"><span>{mode==='down'?'残り時間':'経過時間'}</span><time>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</time></div>
    <p className="game-progress">Lv.{level} · 累計{totalScore}点 · 次のレベルまで{perLevel-intoLevel}点</p>
-   {ended?<div className="game-summary" role="status"><p className="eyebrow">TIME IS UP</p><h1>おつかれさま！</h1><p><strong>{score}</strong>問正解</p><p className="game-earned-score">今回 +{score*correctAnswerPoints}点</p><p>{minutes}分のチャレンジ終了。左上から戻れます。</p>{lastExplanation&&<p>{kind==='trivia'?'最後に答えた問題':'最後に正解した問題'}：{lastExplanation}</p>}</div>:question?<>
+   {ended?<div className="game-summary" role="status"><p className="eyebrow">TIME IS UP</p><h1>おつかれさま！</h1><p><strong>{score}</strong>問正解</p><p className="game-earned-score">今回 +{score*correctAnswerPoints}点</p><p>{minutes}分のチャレンジ終了。左上から戻れます。</p>{lastExplanation&&<p>{isTrivia?'最後に答えた問題':'最後に正解した問題'}：{lastExplanation}</p>}</div>:question?<>
     <h1 className={kind==='calculation'?'focus-calculation':'focus-riddle'}>{kind==='calculation'?<><span>{question.prompt.slice(0,-4)}</span><span className="equation-result"> = ?</span></>:question.prompt}</h1>
-    {question.choices?<><p className="quiz-instruction">1回タップで選択、同じ答えをもう1回で確定。</p><div className={`focus-choices${kind==='trivia'?' trivia-choices':''}`}>{question.choices.map((choice,i)=><button key={`${question.id}:${choice}`} ref={kind==='trivia'&&i===0?triviaFirstChoice:undefined} aria-pressed={selectedChoice===choice} disabled={kind==='trivia'&&feedback===false} onClick={()=>submit(choice)}>{choice}</button>)}</div></>:
+    {question.choices?<>
+     <p className="quiz-instruction">同じ答えを2回タップして確定。</p>
+     <div className={`focus-choices${isTrivia?' trivia-choices':''}`}>{question.choices.map((choice,i)=><button
+      key={`${question.id}:${choice}`}
+      ref={isTrivia&&i===0?triviaFirstChoice:undefined}
+      type="button"
+      aria-pressed={selectedChoice===choice}
+      disabled={isTrivia&&feedback===false}
+      data-correct={isTrivia&&feedback===false&&choice===question.answer?true:undefined}
+      onClick={()=>submit(choice)}
+     >{isTrivia&&<span className="trivia-choice-symbol" aria-hidden="true">{choice==='本当'?'○':'×'}</span>}{choice}</button>)}</div>
+    </>:
      <form className="focus-answer" onSubmit={e=>{e.preventDefault();submit(answer,true);}}><label htmlFor="calculation-answer">答え</label><input ref={input} id="calculation-answer" inputMode="numeric" autoComplete="off" autoCapitalize="off" spellCheck={false} value={answer} onChange={e=>{if(locked.current)return;setAnswer(e.target.value);setAnnouncement('');submit(e.target.value);}} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={e=>{composing.current=false;submit(e.currentTarget.value);}} maxLength={8}/><p>2桁×2桁 ／ 4桁＋4桁 ／ 4桁−4桁<br/>正解したらすぐ次へ。ボタンを押す必要はありません。</p></form>}
     {kind!=='calculation'?<div className="focus-feedback">
-     <div role="status"><p className={feedback===false?'quiz-error':''}>{announcement||'答えをひとつ選んでください。'}</p>
-      {kind==='trivia'&&feedback===false?<p>{question.explanation}</p>:lastExplanation&&<p className="previous-explanation">前の問題の解説：{lastExplanation}</p>}
+     <div role="status"><p className={feedback===false?'quiz-error':''}>
+      {isTrivia&&feedback!==null&&<span className="trivia-result-symbol" aria-hidden="true">{feedback?'○':'×'}</span>}
+      {announcement||'答えをひとつ選んでください。'}
+     </p>
+      {isTrivia&&feedback===false?<p>{question.explanation}</p>:lastExplanation&&<p className="previous-explanation">前の問題の解説：{lastExplanation}</p>}
      </div>
-     {kind==='trivia'&&feedback===false&&<button className="secondary trivia-next-question" ref={triviaNextButton} onClick={nextTriviaQuestion}>次の問題</button>}
+     {isTrivia&&feedback===false&&<button className="secondary trivia-next-question" ref={triviaNextButton} onClick={nextTriviaQuestion}>次の問題</button>}
     </div>:<p className="speed-feedback" role="status">{announcement}</p>}
    </>:<p role="status">問題を準備しています…</p>}
   </section>

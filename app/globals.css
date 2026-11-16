@@ -72,6 +72,10 @@
 .focus-feedback p.quiz-error{color:#9b4125;font-weight:600}
 .focus-feedback p.previous-explanation{font-size:13px;color:#6e7c5e;border-top:1px solid #d8e1cc;padding-top:10px;margin-top:12px}
 .trivia-choices { grid-template-columns: repeat(2,minmax(0,1fr)); max-width: 480px; }
+.trivia-choices button { display: grid; place-items: center; gap: 4px; padding: 10px 8px; font-size: 15px; }
+.trivia-choice-symbol { font-size: clamp(34px,7vw,48px); font-weight: 800; line-height: 1; }
+.trivia-choices button[data-correct="true"] { opacity: 1; border-color: var(--green); background: #e0edca; font-weight: 700; }
+.trivia-result-symbol { margin-inline-end: 6px; font-weight: 800; }
 .trivia-next-question { width: auto; min-height: 44px; margin: 12px auto 0; }
 .trivia-reader > .game-back { display: inline-flex; align-items: center; min-height: 44px; }
 .trivia-reader-content { max-width: 620px; margin: 32px auto; }

@@ -203,7 +203,7 @@ export default function Home() {
     <a className="home-text-link" href="#home">ホームへ戻る</a></section>
     <section id="games" className="play-launcher home-secondary-view" hidden={activeView!=='games'} aria-labelledby="play-title"><h2 id="play-title">ほかのゲーム</h2><p>計算やクイズでも、正解するたびにスコアが増えます。</p>
      <label htmlFor="game-kind">遊びの種類</label><select id="game-kind" value={gameKind} onChange={e=>setGameKind(e.target.value as GameKind)} disabled={!ready}>{Object.entries(GAME_LABELS).map(([kind,label])=><option key={kind} value={kind}>{label}</option>)}</select>
-     <p className="content-count">なぞなぞ{QUESTION_COUNTS.riddle}問・数列{QUESTION_COUNTS.sequence}問・ことば{QUESTION_COUNTS.word}問・本当かウソか{QUESTION_COUNTS.trivia}問。1回のプレイでは一巡するまで同じ問題を出しません。</p>
+     <p className="content-count">なぞなぞ{QUESTION_COUNTS.riddle}問・数列{QUESTION_COUNTS.sequence}問・ことば{QUESTION_COUNTS.word}問・豆知識○×{QUESTION_COUNTS.trivia}問。1回のプレイでは一巡するまで同じ問題を出しません。</p>
      <label htmlFor="timer-mode">タイマーの方式</label><select id="timer-mode" value={timerMode} onChange={e=>setTimerMode(e.target.value as TimerMode)} disabled={!ready}><option value="down">カウントダウン</option><option value="up">カウントアップ</option></select>
      {timerMode==='down'?<><label htmlFor="game-minutes">遊ぶ時間</label><select id="game-minutes" value={gameMinutes} onChange={e=>setGameMinutes(Number(e.target.value))} disabled={!ready}>{[1,2,3,5,10,15,30,60].map(n=><option key={n} value={n}>{n}分</option>)}</select></>:<p className="timer-explanation">0:00から計測。戻るまで好きなだけ遊べます。</p>}
      <a className="secondary play-start" href={playHref(gameKind,gameMinutes,timerMode)}>暇つぶしページで遊ぶ <span>↗</span></a>

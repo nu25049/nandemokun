@@ -63,7 +63,7 @@ describe('拡充した候補と問題',()=>{
  it('真偽クイズは両方の答えを出題し、一巡するまで同じ問題を出さない',()=>{
   expect(playSettings({kind:'trivia',minutes:'1'}).kind).toBe('trivia');
   const bank=questionBank('trivia');
-  expect(bank.length).toBeGreaterThanOrEqual(48);
+  expect(bank.length).toBeGreaterThanOrEqual(160);
   expect(bank.filter(question=>question.answer==='本当')).toHaveLength(bank.length/2);
   expect(new Set(bank.map(question=>question.prompt)).size).toBe(bank.length);
   const seen:string[]=[];
@@ -78,7 +78,7 @@ describe('拡充した候補と問題',()=>{
   expect(nextQuestion('trivia',seen,()=>0).id).not.toBe(seen[seen.length-1]);
  });
  it('読む用の雑学は重複のない独立したデータを使う',()=>{
-  expect(TRIVIA_FACTS.length).toBeGreaterThanOrEqual(64);
+  expect(TRIVIA_FACTS.length).toBeGreaterThanOrEqual(200);
   expect(new Set(TRIVIA_FACTS.map(fact=>fact.id)).size).toBe(TRIVIA_FACTS.length);
   expect(new Set(TRIVIA_FACTS.map(fact=>fact.title)).size).toBe(TRIVIA_FACTS.length);
   for(const fact of TRIVIA_FACTS)expect(`${fact.title.trim()}\n${fact.detail.trim()}`).toMatch(/\S\n\S/);

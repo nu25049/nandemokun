@@ -1,7 +1,7 @@
 import {riddleQuestions,sequenceQuestions,wordQuestions} from './question-bank';
 import {TRIVIA_QUESTIONS} from './trivia-questions';
 
-export const GAME_LABELS={calculation:'計算チャレンジ',riddle:'なぞなぞ・ひらめき問題',sequence:'数列・規則チャレンジ',word:'ことば遊び',trivia:'本当かウソかクイズ'} as const;
+export const GAME_LABELS={calculation:'計算チャレンジ',riddle:'なぞなぞ・ひらめき問題',sequence:'数列・規則チャレンジ',word:'ことば遊び',trivia:'豆知識○×クイズ'} as const;
 export type GameKind = keyof typeof GAME_LABELS;
 export type TimerMode = 'down' | 'up';
 export const DEFAULT_PLAY_MINUTES=30;

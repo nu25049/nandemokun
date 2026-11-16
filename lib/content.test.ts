@@ -1,7 +1,8 @@
 import {describe,expect,it} from 'vitest';
 import {catalog} from './catalog';
 import {parseActions} from './actions';
-import {checkAnswer,nextQuestion,QUESTION_COUNTS,questionBank,type GameKind} from './play';
+import {checkAnswer,nextQuestion,playSettings,QUESTION_COUNTS,questionBank,type GameKind} from './play';
+import {TRIVIA_FACTS} from './trivia-facts';
 
 describe('拡充した候補と問題',()=>{
  it('144件の具体的な候補に重複ID・名称がなく、保存候補と同じ制約を守る',()=>{
@@ -58,5 +59,28 @@ describe('拡充した候補と問題',()=>{
   const seen:string[]=[];const total=questionBank('riddle').length;
   for(let i=0;i<total;i++){const q=nextQuestion('riddle',seen,()=>0);expect(seen).not.toContain(q.id);seen.push(q.id);}
   expect(nextQuestion('riddle',seen,()=>0).id).not.toBe(seen[seen.length-1]);
+ });
+ it('真偽クイズは両方の答えを出題し、一巡するまで同じ問題を出さない',()=>{
+  expect(playSettings({kind:'trivia',minutes:'1'}).kind).toBe('trivia');
+  const bank=questionBank('trivia');
+  expect(bank.length).toBeGreaterThanOrEqual(48);
+  expect(bank.filter(question=>question.answer==='本当')).toHaveLength(bank.length/2);
+  expect(new Set(bank.map(question=>question.prompt)).size).toBe(bank.length);
+  const seen:string[]=[];
+  for(const _ of bank){
+   const question=nextQuestion('trivia',seen,()=>0);
+   expect(seen).not.toContain(question.id);
+   expect(question.choices).toEqual(['本当','ウソ']);
+   expect(question.choices?.filter(choice=>checkAnswer(question,choice))).toEqual([question.answer]);
+   expect(question.explanation.trim()).not.toBe('');
+   seen.push(question.id);
+  }
+  expect(nextQuestion('trivia',seen,()=>0).id).not.toBe(seen[seen.length-1]);
+ });
+ it('読む用の雑学は重複のない独立したデータを使う',()=>{
+  expect(TRIVIA_FACTS.length).toBeGreaterThanOrEqual(64);
+  expect(new Set(TRIVIA_FACTS.map(fact=>fact.id)).size).toBe(TRIVIA_FACTS.length);
+  expect(new Set(TRIVIA_FACTS.map(fact=>fact.title)).size).toBe(TRIVIA_FACTS.length);
+  for(const fact of TRIVIA_FACTS)expect(`${fact.title.trim()}\n${fact.detail.trim()}`).toMatch(/\S\n\S/);
  });
 });

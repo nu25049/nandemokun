@@ -9,6 +9,7 @@ describe('時間と種類に合わせる提案',()=>{
  it('保存候補0件でも、1分から外部接続なしで遊べる',()=>{
   const pool=recommendations([],[],[],1,false,'all');expect(pool.length).toBeGreaterThan(4);
   expect(pool.every(p=>['play','library'].includes(p.source)&&p.minutes===1)).toBe(true);
+  expect(pool).toContainEqual(expect.objectContaining({game:'trivia',minutes:1,source:'play'}));
  });
  it('自分の候補の0件・1件と、種類を限定した連続回避を守る',()=>{
   expect(recommendations([],[],[],1,false,'saved')).toEqual([]);

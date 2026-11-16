@@ -1,5 +1,7 @@
 import {riddleQuestions,sequenceQuestions,wordQuestions} from './question-bank';
-export const GAME_LABELS={calculation:'計算チャレンジ',riddle:'なぞなぞ・ひらめき問題',sequence:'数列・規則チャレンジ',word:'ことば遊び'} as const;
+import {TRIVIA_QUESTIONS} from './trivia-questions';
+
+export const GAME_LABELS={calculation:'計算チャレンジ',riddle:'なぞなぞ・ひらめき問題',sequence:'数列・規則チャレンジ',word:'ことば遊び',trivia:'本当かウソかクイズ'} as const;
 export type GameKind = keyof typeof GAME_LABELS;
 export type TimerMode = 'down' | 'up';
 export const DEFAULT_PLAY_MINUTES=30;
@@ -13,8 +15,16 @@ export function playHref(kind:GameKind,minutes:number,mode:TimerMode):string {
 export type Question = { id: string; prompt: string; answer: string; explanation: string; choices?: string[] };
 
 const index = (length: number, random: () => number) => Math.min(length - 1, Math.max(0, Math.floor(random() * length)));
-export function questionBank(kind:GameKind):readonly Question[]{return kind==='riddle'?riddleQuestions:kind==='sequence'?sequenceQuestions:kind==='word'?wordQuestions:[];}
-export const QUESTION_COUNTS={riddle:riddleQuestions.length,sequence:sequenceQuestions.length,word:wordQuestions.length};
+const triviaQuestions: Question[] = TRIVIA_QUESTIONS.map(({id, statement, answer, explanation}) => ({
+ id,
+ prompt: statement,
+ answer: answer ? '本当' : 'ウソ',
+ explanation,
+ choices: ['本当', 'ウソ'],
+}));
+const questionBanks = {calculation: [], riddle: riddleQuestions, sequence: sequenceQuestions, word: wordQuestions, trivia: triviaQuestions};
+export function questionBank(kind:GameKind):readonly Question[]{return questionBanks[kind];}
+export const QUESTION_COUNTS={riddle:riddleQuestions.length,sequence:sequenceQuestions.length,word:wordQuestions.length,trivia:triviaQuestions.length};
 export function nextQuestion(kind: GameKind, previousId?: string|readonly string[], random = Math.random): Question {
  const previous=typeof previousId==='string'?[previousId]:previousId??[];
  if (kind !== 'calculation') {
@@ -22,6 +32,7 @@ export function nextQuestion(kind: GameKind, previousId?: string|readonly string
   let choices = bank.filter(item => !previous.includes(item.id));
   if(!choices.length)choices=bank.filter(item=>item.id!==previous[previous.length-1]);
   const question = choices[index(choices.length, random)];
+  if(kind==='trivia')return question;
   // 正解の位置が固定にならないよう選択肢を並べ替える。
   const options = [...question.choices!];
   for (let i = options.length - 1; i > 0; i--) { const j = index(i + 1, random); [options[i], options[j]] = [options[j], options[i]]; }

@@ -71,6 +71,14 @@
 .quiz-instruction{font-size:13px;color:#677855;line-height:1.8;margin:0 0 18px}
 .focus-feedback p.quiz-error{color:#9b4125;font-weight:600}
 .focus-feedback p.previous-explanation{font-size:13px;color:#6e7c5e;border-top:1px solid #d8e1cc;padding-top:10px;margin-top:12px}
+.trivia-choices { grid-template-columns: repeat(2,minmax(0,1fr)); max-width: 480px; }
+.trivia-next-question { width: auto; min-height: 44px; margin: 12px auto 0; }
+.trivia-reader > .game-back { display: inline-flex; align-items: center; min-height: 44px; }
+.trivia-reader-content { max-width: 620px; margin: 32px auto; }
+.trivia-reader-content h1 { font-size: clamp(26px,6vw,40px); line-height: 1.4; margin: 0 0 10px; }
+.trivia-fact { background: #fff; border: 1px solid #d9e2ce; border-radius: 18px; padding: clamp(18px,5vw,30px); overflow-wrap: anywhere; }
+.trivia-fact h2 { font-size: clamp(19px,5vw,26px); line-height: 1.5; margin: 0 0 10px; }
+.trivia-fact p { margin: 0; line-height: 1.8; }
 @media(max-width:650px){.focus-calculation .equation-result{display:block;font-size:.65em;line-height:1.4;margin-top:6px}.quiz-instruction{font-size:12px}.quick-play-links{gap:8px}}
 .preferences-section{border-top:1px solid #d9ddd3;padding:35px 0 45px;scroll-margin-top:20px}
 .preferences-columns{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}

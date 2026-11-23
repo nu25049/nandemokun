@@ -2,9 +2,19 @@ import {parseActions,STORAGE_KEY,type Action} from './actions';
 import {parsePreferences,parseRecent,PREFERENCES_KEY,HISTORY_KEY,type Preferences} from './preferences';
 import {parseEngagement,ENGAGEMENT_KEY,canRemember,type Engagement} from './engagement';
 import {recommendations} from './recommendations';
+import {GAME_PROGRESS_KEY,parseGameBestScores,type GameProgress} from './game-progress';
 
 export const MAX_BACKUP_BYTES=2*1024*1024;
-export type Backup={format:'himanakimihe-backup';version:1;createdAt:string;actions:Action[];preferences:Preferences;engagement:Engagement;recent:string[]};
+export type Backup = {
+ format: 'himanakimihe-backup';
+ version: 1;
+ createdAt: string;
+ actions: Action[];
+ preferences: Preferences;
+ engagement: Engagement;
+ recent: string[];
+ gameProgress?: GameProgress;
+};
 export function parseBackup(raw:string):Backup {
  if(new TextEncoder().encode(raw).byteLength>MAX_BACKUP_BYTES)throw new Error('ファイルは2MB以内にしてください。');
  const value:unknown=JSON.parse(raw);
@@ -19,15 +29,39 @@ export function parseBackup(raw:string):Backup {
  const engagement=parseEngagement(JSON.stringify(v.engagement),pool);
  const known=new Set(pool.filter(canRemember).map(item=>item.id));
  const recent=parseRecent(JSON.stringify(v.recent)).filter(id=>known.has(id));
- return {format:'himanakimihe-backup',version:1,createdAt:new Date(v.createdAt).toISOString(),actions,preferences,engagement,recent};
+ let gameProgress: GameProgress | undefined;
+ if (Object.hasOwn(v, 'gameProgress')) {
+  const progress = v.gameProgress;
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
+   throw new Error('ゲーム記録の形式が違います。');
+  }
+  const {totalScore, bestTap} = progress as Record<string, unknown>;
+  if (
+   typeof totalScore !== 'number' || !Number.isSafeInteger(totalScore) || totalScore < 0 ||
+   typeof bestTap !== 'number' || !Number.isSafeInteger(bestTap) || bestTap < 0
+  ) {
+   throw new Error('ゲーム記録の点数が不正です。');
+  }
+  const bestScores = Object.hasOwn(progress, 'bestScores') ? parseGameBestScores((progress as Record<string,unknown>).bestScores, true) : undefined;
+  gameProgress = {totalScore, bestTap, ...(bestScores ? {bestScores} : {})};
+ }
+ return {format:'himanakimihe-backup',version:1,createdAt:new Date(v.createdAt).toISOString(),actions,preferences,engagement,recent,...(gameProgress?{gameProgress}:{})};
 }
-export function createBackup(actions:Action[],preferences:Preferences,engagement:Engagement,recent:string[],now=new Date()):Backup {
- return parseBackup(JSON.stringify({format:'himanakimihe-backup',version:1,createdAt:now.toISOString(),actions,preferences,engagement,recent}));
+export function createBackup(
+ actions: Action[],
+ preferences: Preferences,
+ engagement: Engagement,
+ recent: string[],
+ now = new Date(),
+ gameProgress?: GameProgress,
+): Backup {
+ return parseBackup(JSON.stringify({format:'himanakimihe-backup',version:1,createdAt:now.toISOString(),actions,preferences,engagement,recent,gameProgress}));
 }
 type StorageAccess=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
 export function writeBackup(storage:StorageAccess,backup:Backup):void {
  const valid=parseBackup(JSON.stringify(backup));
  const values:[string,string][]=[[STORAGE_KEY,JSON.stringify(valid.actions)],[PREFERENCES_KEY,JSON.stringify(valid.preferences)],[ENGAGEMENT_KEY,JSON.stringify(valid.engagement)],[HISTORY_KEY,JSON.stringify(valid.recent)]];
+ if(valid.gameProgress)values.push([GAME_PROGRESS_KEY,JSON.stringify(valid.gameProgress)]);
  const previous=values.map(([key])=>[key,storage.getItem(key)] as const);
  try{for(const [key,value] of values)storage.setItem(key,value);}
  catch{

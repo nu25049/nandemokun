@@ -4,6 +4,7 @@ import {STORAGE_KEY,type Action} from './actions';
 import {defaultPreferences,HISTORY_KEY,PREFERENCES_KEY} from './preferences';
 import {ENGAGEMENT_KEY,emptyEngagement} from './engagement';
 import {recommendations} from './recommendations';
+import {GAME_PROGRESS_KEY} from './game-progress';
 
 const action:Action={id:'backup-one',title:'1分で机の物を戻す',minutes:1,place:'indoor',note:'3つ戻したら終了'};
 const now=new Date('2026-11-09T00:00:00.000Z');
@@ -61,5 +62,85 @@ describe('端末内データの持ち運び',()=>{
   const storage=memory({[STORAGE_KEY]:'existing'}),previous=new Map(storage.data);
   storage.getItem=()=>{throw new Error('storage blocked')};
   expect(()=>writeBackup(storage,fixture())).toThrow();expect(storage.data).toEqual(previous);
+ });
+ it('ゲームの累計と自己ベストを持ち運び、余分なフィールドを除去する', () => {
+  const backup = createBackup([action], defaultPreferences(), emptyEngagement(), [], now, {totalScore: 1250, bestTap: 90});
+  const parsed = parseBackup(JSON.stringify({...backup, gameProgress: {...backup.gameProgress, token: 'private'}}));
+  const storage = memory();
+  writeBackup(storage, parsed);
+  expect(parsed.gameProgress).toEqual({totalScore: 1250, bestTap: 90});
+  expect(JSON.parse(storage.getItem(GAME_PROGRESS_KEY)!)).toEqual(parsed.gameProgress);
+  expect(JSON.stringify(parsed)).not.toContain('private');
+ });
+ it('ゲーム記録のない旧ファイルでは、復元先のゲーム記録を維持する', () => {
+  const existing = JSON.stringify({totalScore: 430, bestTap: 60});
+  const storage = memory({[GAME_PROGRESS_KEY]: existing});
+  const legacy = parseBackup(JSON.stringify(fixture()));
+  expect(Object.hasOwn(legacy, 'gameProgress')).toBe(false);
+  writeBackup(storage, legacy);
+  expect(storage.getItem(GAME_PROGRESS_KEY)).toBe(existing);
+ });
+ it('不正なゲーム記録を保存前に拒否し、復元先のデータを維持する', () => {
+  const backup = fixture();
+  const storage = memory({[GAME_PROGRESS_KEY]: 'previous-score', [STORAGE_KEY]: 'previous-actions'});
+  const previous = new Map(storage.data);
+  const invalid = [null, [], 'score', {}, {totalScore: 10}, {totalScore: -1, bestTap: 0}, {totalScore: 1.5, bestTap: 0}, {totalScore: '100', bestTap: 0}, {totalScore: Number.MAX_SAFE_INTEGER + 1, bestTap: 0}, {totalScore: 0, bestTap: -10}];
+  for (const gameProgress of invalid) {
+   expect(() => parseBackup(JSON.stringify({...backup, gameProgress}))).toThrow();
+   expect(() => writeBackup(storage, {...backup, gameProgress} as typeof backup)).toThrow();
+   expect(storage.data).toEqual(previous);
+  }
+ });
+ it('ゲーム記録の保存に失敗したら、得点を含めた全項目を元に戻す', () => {
+  for (const originalScore of [undefined, JSON.stringify({totalScore: 220, bestTap: 30})]) {
+   const storage = memory({[STORAGE_KEY]: 'previous-actions'});
+   if (originalScore !== undefined) storage.setItem(GAME_PROGRESS_KEY, originalScore);
+   const previous = new Map(storage.data);
+   const set = storage.setItem;
+   let failed = false;
+   storage.setItem = (key, value) => {
+    if (key === GAME_PROGRESS_KEY && !failed) {
+     failed = true;
+     set(key, value);
+     throw new Error('write interrupted');
+    }
+    set(key, value);
+   };
+   const backup = {...fixture(), gameProgress: {totalScore: 1250, bestTap: 90}};
+   expect(() => writeBackup(storage, backup)).toThrow('元のデータに戻しました');
+   expect(storage.data).toEqual(previous);
+  }
+ });
+
+ it('種類・時間別の自己ベストを失わず持ち運び、従来のゲーム記録も読み込む', () => {
+  const gameProgress = {totalScore: 920, bestTap: 80, bestScores: {'trivia:down:1': 9, 'trivia:down:3': 19, 'word:up': 0}};
+  const backup = createBackup([action], defaultPreferences(), emptyEngagement(), [], now, gameProgress);
+  const parsed = parseBackup(JSON.stringify(backup));
+  expect(parsed.gameProgress).toEqual(gameProgress);
+  const storage = memory();
+  writeBackup(storage, parsed);
+  expect(JSON.parse(storage.getItem(GAME_PROGRESS_KEY)!)).toEqual(gameProgress);
+  const legacy = parseBackup(JSON.stringify({...backup, gameProgress: {totalScore: 400, bestTap: 20}}));
+  expect(legacy.gameProgress).toEqual({totalScore: 400, bestTap: 20});
+  writeBackup(storage, legacy);
+  expect(JSON.parse(storage.getItem(GAME_PROGRESS_KEY)!)).toEqual(legacy.gameProgress);
+ });
+
+ it('自己ベストの未知のキー・不正値・過大な記録を復元前に拒否する', () => {
+  const backup = fixture();
+  const storage = memory({[GAME_PROGRESS_KEY]: 'previous-record'});
+  const previous = new Map(storage.data);
+  const invalid = [
+   null, [], 'records', {'unknown:up': 1}, {'trivia:down:4': 2},
+   {'word:up': -1}, {'word:up': 1.5}, {'word:up': '2'}, {'word:up': Infinity},
+   {'word:up': NaN}, {'word:up': Number.MAX_SAFE_INTEGER + 1},
+   Object.fromEntries(Array.from({length: 46},(_,i) => ['key'+i, i])),
+  ];
+  for (const bestScores of invalid) {
+   const data = {...backup, gameProgress: {totalScore: 10, bestTap: 0, bestScores}};
+   expect(() => parseBackup(JSON.stringify(data))).toThrow();
+   expect(() => writeBackup(storage, data as typeof backup)).toThrow();
+   expect(storage.data).toEqual(previous);
+  }
  });
 });

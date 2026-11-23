@@ -15,10 +15,23 @@ export default function IdeasPanel(){
   try{const raw=localStorage.getItem(STORAGE_KEY);saved.current=raw===null?initialActions:parseActions(raw);}catch{setNotice('自分の保存候補を読み込めませんでした。カタログは利用できます。');}
   const pool=recommendations(saved.current,[],[],null,false,'all');
   try{const next=parseEngagement(localStorage.getItem(ENGAGEMENT_KEY),pool);current.current=next;setState(next);}catch{setNotice('お気に入りを読み込めませんでした。カタログは利用できます。');}
-  try{const raw=localStorage.getItem(PREFERENCES_KEY);if(raw)setPrefs(parsePreferences(JSON.parse(raw)));}catch{/* 不正な好みは初期値で続ける。 */}
-  const controller=new AbortController();
-  void fetch('/api/account',{cache:'no-store',signal:controller.signal}).then(response=>response.ok?response.json():null).then(data=>{if(data?.user&&data.preferences&&!controller.signal.aborted)setPrefs(parsePreferences(data.preferences));}).catch(()=>{});
-  setReady(true);return()=>controller.abort();
+  function loadPreferences(){
+   try{
+    const raw=localStorage.getItem(PREFERENCES_KEY);
+    setPrefs(raw===null?defaultPreferences():parsePreferences(JSON.parse(raw)));
+   }catch{
+    setPrefs(defaultPreferences());
+    setNotice('保存された好みを読み込めなかったため、初期値で候補を選びます。ホームの好みから選び直せます。');
+   }
+   setSelected(null);
+  }
+  function syncPreferences(event:StorageEvent){
+   if(event.key===PREFERENCES_KEY||event.key===null)loadPreferences();
+  }
+  loadPreferences();
+  setReady(true);
+  window.addEventListener('storage',syncPreferences);
+  return()=>window.removeEventListener('storage',syncPreferences);
  },[]);
  const items=discover(catalog,filters,state.favorites),visible=items.slice(0,limit);
  function update(next:Partial<DiscoveryFilters>){setFilters(value=>({...value,...next}));setLimit(12);setSelected(null);}
@@ -30,5 +43,5 @@ export default function IdeasPanel(){
   <div className="idea-results-top"><p aria-live="polite">{items.length}件見つかりました</p><button className="weather-button" disabled={!ready||!items.length} onClick={choose}>この条件からひとつ選ぶ</button><button className="cancel" onClick={()=>{setFilters(defaultDiscoveryFilters());setLimit(12);setSelected(null);}}>検索条件をリセット</button></div>
   <p className="connection-notice" role="status">{notice}</p>{selected&&items.some(item=>item.id===selected.id)&&<section className="idea-picked" aria-label="選ばれた暇つぶし">{card(selected,true)}</section>}
   {!items.length?<p className="empty">検索に合う暇つぶしがありません。時間やキーワードを変えてください。</p>:<section className="idea-grid" aria-label="暇つぶし一覧">{visible.map(item=>card(item))}</section>}
-  {limit<items.length&&<button className="weather-button idea-more" onClick={()=>setLimit(value=>value+12)}>もっと見る（残り{items.length-limit}件）</button>}<footer><a href="/">← ホームへ戻る</a><p>ログインなしで探して、すぐ始められます。</p></footer></main>;
+  {limit<items.length&&<button className="weather-button idea-more" onClick={()=>setLimit(value=>value+12)}>もっと見る（残り{items.length-limit}件）</button>}<footer><a href="/">← ホームへ戻る</a><p>気になる候補を選んで、すぐ始められます。</p></footer></main>;
 }

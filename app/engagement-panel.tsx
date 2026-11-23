@@ -19,7 +19,7 @@ export default function EngagementPanel({state,pool,eligibleIds,notice,onChange,
  const done=feedback.filter(row=>row.outcome==='done').length,skipped=feedback.filter(row=>row.outcome==='skip').length;
  const factors=learningFactors(state);
  return <section id="activity" className="activity-section">
-  <div className="section-heading"><div><span className="eyebrow">YOUR NEXT FAVORITE</span><h2>やってみた、を次につなげる。</h2></div><p>記録はこのブラウザーだけ。ログイン不要。</p></div>
+  <div className="section-heading"><div><span className="eyebrow">YOUR NEXT FAVORITE</span><h2>やってみた、を次につなげる。</h2></div><p>記録はこのブラウザーに保存します。</p></div>
   <div className="activity-columns">
    <div className="preference-card"><h3>自分に合う提案へ</h3><p>提案{feedback.length}件 · やってみた{done}件 · 見送り{skipped}件 · 未評価{feedback.length-done-skipped}件</p>
     <label className="repeat-option"><input type="checkbox" checked={state.learn} onChange={e=>onChange({...state,learn:e.target.checked})}/>利用結果を次の提案に反映する</label>
@@ -35,7 +35,7 @@ export default function EngagementPanel({state,pool,eligibleIds,notice,onChange,
   </div>
   <details className="activity-history"><summary>最近の利用記録（最新100件）</summary>
    {!feedback.length?<p>次の提案から記録します。戻ってからでも、ここで評価できます。</p>:<ol className="activity-list">{feedback.slice().reverse().map(row=><li key={row.id}><div><strong>{known.get(row.recommendationId)!.title}</strong><small>{new Date(row.at).toLocaleString('ja-JP')} · {row.outcome==='done'?'やってみた':row.outcome==='skip'?'今回は見送る':'未評価'}</small></div><div className="history-actions"><button aria-pressed={row.outcome==='done'} aria-label={known.get(row.recommendationId)!.title+'をやってみたとして記録'} onClick={()=>onChange({...state,feedback:state.feedback.map(entry=>entry.id===row.id?{...entry,outcome:'done'}:entry)})}>やってみた</button><button aria-pressed={row.outcome==='skip'} aria-label={known.get(row.recommendationId)!.title+'を見送りとして記録'} onClick={()=>onChange({...state,feedback:state.feedback.map(entry=>entry.id===row.id?{...entry,outcome:'skip'}:entry)})}>見送り</button><button aria-label={known.get(row.recommendationId)!.title+'の利用記録を削除'} onClick={()=>onChange({...state,feedback:state.feedback.filter(entry=>entry.id!==row.id)})}>削除</button></div></li>)}</ol>}
-   <p>候補の内容は現在の登録から表示します。削除した候補は表示せず、お店・課題・位置情報は記録しません。お気に入りと利用記録はアカウント保存の対象外です。</p>
+   <p>候補の内容は現在の登録から表示します。削除した候補は表示せず、お店・課題・位置情報は記録しません。お気に入りと利用記録は、バックアップファイルから引き継げます。</p>
   </details>
  </section>;
 }

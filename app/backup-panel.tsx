@@ -4,13 +4,14 @@ import {createBackup,parseBackup,writeBackup,MAX_BACKUP_BYTES,type Backup} from 
 import type {Action} from '../lib/actions';
 import type {Preferences} from '../lib/preferences';
 import type {Engagement} from '../lib/engagement';
+import {gameLevel,readGameProgress} from '../lib/game-progress';
 
 export default function BackupPanel({actions,preferences,engagement,recent,ready}:{actions:Action[];preferences:Preferences;engagement:Engagement;recent:()=>string[];ready:boolean}){
  const [pending,setPending]=useState<Backup|null>(null),[notice,setNotice]=useState(''),[reading,setReading]=useState(false);
  const request=useRef(0);
  function download(){
   try{
-   const backup=createBackup(actions,preferences,engagement,recent());
+   const backup=createBackup(actions,preferences,engagement,recent(),new Date(),readGameProgress());
    const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}));
    const link=document.createElement('a'),now=new Date();
    link.href=url;link.download='himanakimihe-'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'.json';
@@ -31,12 +32,38 @@ export default function BackupPanel({actions,preferences,engagement,recent,ready
   catch(error){setNotice(error instanceof Error?error.message:'復元できませんでした。');}
  }
  return <section className="backup-section" id="backup" aria-labelledby="backup-title">
-  <div className="section-heading"><div><span className="eyebrow">TAKE IT WITH YOU</span><h2 id="backup-title">データを保存・引き継ぎ</h2></div><p>ログインなしで、ファイルから引き継げます。</p></div>
+  <div className="section-heading"><div><span className="eyebrow">TAKE IT WITH YOU</span><h2 id="backup-title">データを保存・引き継ぎ</h2></div><p>ファイルから別のブラウザーへ引き継げます。</p></div>
   <div className="activity-columns">
-   <div className="preference-card"><h3>今のデータを保存</h3><p>自分の候補・提案の好み・お気に入り・利用履歴を、ひとつのファイルに保存します。</p><button className="weather-button" disabled={!ready} onClick={download}>バックアップをダウンロード</button><p>Canvasやお店の情報、現在地、ログイン情報は含めません。ファイルはこのブラウザーで作成し、サーバーには送信しません。</p></div>
-   <div className="preference-card"><h3>保存したファイルから復元</h3><label htmlFor="backup-file">バックアップファイル（JSON・2MB以内）</label><input id="backup-file" type="file" accept=".json,application/json" disabled={!ready} onChange={e=>void read(e.target.files?.[0])}/><p>復元すると、このブラウザーの候補・ゲスト用の好み・お気に入り・履歴を置き換えます。アカウントの設定は変更しません。</p>
+   <div className="preference-card">
+    <h3>今のデータを保存</h3>
+    <p>自分の候補・提案の好み・お気に入り・利用履歴・ゲームの累計点と自己ベストを、ひとつのファイルに保存します。</p>
+    <button className="weather-button" disabled={!ready} onClick={download}>バックアップをダウンロード</button>
+    <p>Canvasやお店の情報、現在地は含めません。ファイルはこのブラウザーで作成し、サーバーには送信しません。</p>
+   </div>
+   <div className="preference-card">
+    <h3>保存したファイルから復元</h3>
+    <label htmlFor="backup-file">バックアップファイル（JSON・2MB以内）</label>
+    <input id="backup-file" type="file" accept=".json,application/json" disabled={!ready} onChange={e=>void read(e.target.files?.[0])}/>
+    <p>復元すると、このブラウザーの候補・提案の好み・お気に入り・履歴と、ファイルに含まれるゲーム記録を置き換えます。</p>
     {reading&&<p>ファイルを読み込み中…</p>}
-    {pending&&<div className="backup-preview"><h4>復元する内容</h4><p>保存日時：{new Date(pending.createdAt).toLocaleString('ja-JP')}</p><ul><li>自分の候補：{pending.actions.length}件</li><li>お気に入り：{pending.engagement.favorites.length}件</li><li>利用履歴：{pending.engagement.feedback.length}件</li></ul><p>現在のデータを残す場合は、先にバックアップをダウンロードしてください。復元後は画面を再読み込みします。</p><button className="secondary" onClick={restore} disabled={reading}>この内容で復元する</button><button className="cancel" onClick={()=>{request.current++;setPending(null);setNotice('復元をキャンセルしました。現在のデータは変更していません。');}}>復元をキャンセル</button></div>}
+    {pending&&<div className="backup-preview">
+     <h4>復元する内容</h4>
+     <p>保存日時：{new Date(pending.createdAt).toLocaleString('ja-JP')}</p>
+     <ul>
+      <li>自分の候補：{pending.actions.length}件</li>
+      <li>お気に入り：{pending.engagement.favorites.length}件</li>
+      <li>利用履歴：{pending.engagement.feedback.length}件</li>
+      {pending.gameProgress&&<>
+       <li>ゲームの累計：{pending.gameProgress.totalScore.toLocaleString('ja-JP')}点（Lv. {gameLevel(pending.gameProgress.totalScore).level}）</li>
+       <li>30秒タップの自己ベスト：{pending.gameProgress.bestTap.toLocaleString('ja-JP')}点</li>
+       <li>種類・時間別の自己ベスト：{Object.keys(pending.gameProgress.bestScores ?? {}).length}件</li>
+      </>}
+     </ul>
+     {!pending.gameProgress&&<p>旧形式のファイルです。ゲーム記録は現在の値を引き継ぎます。</p>}
+     <p>現在のデータを残す場合は、先にバックアップをダウンロードしてください。復元後は画面を再読み込みします。</p>
+     <button className="secondary" onClick={restore} disabled={reading}>この内容で復元する</button>
+     <button className="cancel" onClick={()=>{request.current++;setPending(null);setNotice('復元をキャンセルしました。現在のデータは変更していません。');}}>復元をキャンセル</button>
+    </div>}
    </div>
   </div><p className="connection-notice" role="status">{notice}</p>
  </section>;

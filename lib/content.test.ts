@@ -3,6 +3,7 @@ import {catalog} from './catalog';
 import {parseActions} from './actions';
 import {checkAnswer,nextQuestion,playSettings,QUESTION_COUNTS,questionBank,type GameKind} from './play';
 import {TRIVIA_FACTS} from './trivia-facts';
+import {CONVERSATION_TOPICS} from './conversation-topics';
 
 describe('拡充した候補と問題',()=>{
  it('144件の具体的な候補に重複ID・名称がなく、保存候補と同じ制約を守る',()=>{
@@ -82,5 +83,17 @@ describe('拡充した候補と問題',()=>{
   expect(new Set(TRIVIA_FACTS.map(fact=>fact.id)).size).toBe(TRIVIA_FACTS.length);
   expect(new Set(TRIVIA_FACTS.map(fact=>fact.title)).size).toBe(TRIVIA_FACTS.length);
   for(const fact of TRIVIA_FACTS)expect(`${fact.title.trim()}\n${fact.detail.trim()}`).toMatch(/\S\n\S/);
+ });
+ it('話のネタは4分野から選べ、会話のきっかけと出典がある',()=>{
+  expect(CONVERSATION_TOPICS.length).toBeGreaterThanOrEqual(48);
+  expect(new Set(CONVERSATION_TOPICS.map(topic=>topic.id)).size).toBe(CONVERSATION_TOPICS.length);
+  expect(new Set(CONVERSATION_TOPICS.map(topic=>topic.title)).size).toBe(CONVERSATION_TOPICS.length);
+  for(const category of ['food','daily','science','culture']){
+   expect(CONVERSATION_TOPICS.filter(topic=>topic.category===category).length).toBeGreaterThanOrEqual(12);
+  }
+  for(const topic of CONVERSATION_TOPICS){
+   expect([topic.title,topic.detail,topic.prompt,topic.sourceName].every(field=>field.trim())).toBe(true);
+   expect(new URL(topic.source).protocol).toBe('https:');
+  }
  });
 });

@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {checkAnswer,elapsedSeconds,GAME_LABELS,nextQuestion,questionBank,remainingSeconds,type GameKind,type Question,type TimerMode} from '../lib/play';
-import {addGameScore,GAME_PROGRESS_KEY,gameLevel,readGameProgress} from '../lib/game-progress';
+import {addGameScore,GAME_PROGRESS_KEY,gameLevel,gameRecordKey,progressIsSaved,readGameProgress,recordGameBest} from '../lib/game-progress';
 
 const correctAnswerPoints = 10;
 
@@ -14,6 +14,9 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
  const [lastExplanation,setLastExplanation]=useState('');
  const [score,setScore]=useState(0);
  const [totalScore,setTotalScore]=useState(0);
+ const [bestScore,setBestScore]=useState(0);
+ const [startingBest,setStartingBest]=useState(0);
+ const [saveNotice,setSaveNotice]=useState('');
  const [startedAt,setStartedAt]=useState<number|null>(null);
  const [seconds,setSeconds]=useState(mode==='down'?minutes*60:0);
  const [ended,setEnded]=useState(false);
@@ -25,18 +28,24 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
  const composing=useRef(false);
  const selected=useRef<string|null>(null);
  const seen=useRef<string[]>([]);
+ const recordKey=gameRecordKey(kind,minutes,mode);
  function draw(){const bank=questionBank(kind);if(bank.length&&seen.current.length>=bank.length)seen.current=seen.current.slice(-1);const next=nextQuestion(kind,seen.current);seen.current.push(next.id);if(kind==='calculation')seen.current=seen.current.slice(-20);return next;}
 
  // 問題と開始時刻はマウント後に作り、サーバーとブラウザーの表示を一致させる。
  useEffect(()=>{seen.current=[];setQuestion(draw());setStartedAt(Date.now());},[kind]);
  useEffect(()=>{
   function syncProgress(event?:StorageEvent) {
-   if(!event||event.key===null||event.key===GAME_PROGRESS_KEY)setTotalScore(readGameProgress().totalScore);
+   if(event&&event.key!==null&&event.key!==GAME_PROGRESS_KEY)return;
+   const progress=readGameProgress();
+   setTotalScore(progress.totalScore);
+   setBestScore(progress.bestScores?.[recordKey]??0);
+   setSaveNotice(progressIsSaved()?'':'記録を読み込めません。この画面では遊べますが、記録は端末に残らない場合があります。');
   }
+  setStartingBest(readGameProgress().bestScores?.[recordKey]??0);
   syncProgress();
   window.addEventListener('storage',syncProgress);
   return ()=>window.removeEventListener('storage',syncProgress);
- },[]);
+ },[recordKey]);
  useEffect(()=>{
   if(startedAt===null||ended)return;
   const tick=()=>{
@@ -58,8 +67,13 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
 
  function recordCorrectAnswer() {
   locked.current=true;
+  const nextScore=(score+1)*correctAnswerPoints;
   setScore(count=>count+1);
-  setTotalScore(addGameScore(correctAnswerPoints).totalScore);
+  addGameScore(correctAnswerPoints);
+  const progress=recordGameBest(recordKey,nextScore);
+  setTotalScore(progress.totalScore);
+  setBestScore(progress.bestScores?.[recordKey]??0);
+  setSaveNotice(progressIsSaved()?'':'記録を保存できません。この画面では続けられます。再読み込みすると今回の記録が失われる場合があります。');
   setAnnouncement('正解！');
  }
 
@@ -94,11 +108,15 @@ export default function PlayPanel({kind,minutes,mode}:{kind:GameKind;minutes:num
  }
 
  const {level,intoLevel,perLevel}=gameLevel(totalScore);
+ const isNewBest=score*correctAnswerPoints>startingBest&&score*correctAnswerPoints>=bestScore;
+ const nextGoal=Math.min(Number.MAX_SAFE_INTEGER,bestScore+correctAnswerPoints);
  return <main className="focus-game">
   <div className="focus-top"><a className="game-back" href="/">← 戻る</a><span className="game-kind">{GAME_LABELS[kind]}</span><span className="game-score" aria-live="polite">{score}問正解</span></div>
   <section className="focus-stage" aria-label={GAME_LABELS[kind]}>
    <div className="game-clock" aria-live="off"><span>{mode==='down'?'残り時間':'経過時間'}</span><time>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</time></div>
    <p className="game-progress">Lv.{level} · 累計{totalScore}点 · 次のレベルまで{perLevel-intoLevel}点</p>
+   <p className="game-personal-best">{mode==='down'?`${minutes}分`:'カウントアップ'}の自己ベスト <strong>{bestScore}点</strong><br/>{isNewBest?(ended?'自己ベスト更新！':'自己ベスト更新中！'):`次の目標 ${nextGoal}点`}</p>
+   {saveNotice&&<p className="game-save-notice" role="status">{saveNotice}</p>}
    {ended?<div className="game-summary" role="status"><p className="eyebrow">TIME IS UP</p><h1>おつかれさま！</h1><p><strong>{score}</strong>問正解</p><p className="game-earned-score">今回 +{score*correctAnswerPoints}点</p><p>{minutes}分のチャレンジ終了。左上から戻れます。</p>{lastExplanation&&<p>{isTrivia?'最後に答えた問題':'最後に正解した問題'}：{lastExplanation}</p>}</div>:question?<>
     <h1 className={kind==='calculation'?'focus-calculation':'focus-riddle'}>{kind==='calculation'?<><span>{question.prompt.slice(0,-4)}</span><span className="equation-result"> = ?</span></>:question.prompt}</h1>
     {question.choices?<>
